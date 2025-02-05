@@ -1,3 +1,6 @@
-Welcome to v1.0 of the package!
+v1.0.1.2 
+ -- minor bug fix for when W.Q is null
+ -- minor bug fix to all conditioning on V for missingness probabilities for MSMs
+ -- Clarified syntax for specifying parametric model for two-stage missingness mechanism. 
 
 

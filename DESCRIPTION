@@ -1,7 +1,7 @@
 Package: twoStageDesignTMLE
 Title: Targeted Maximum Likelihood Estimation for Two-Stage Study
         Design
-Version: 1.0
+Version: 1.0.1.2
 Authors@R: c(person("Susan", "Gruber", role = c("aut", "cre"), 
 				email = "sgruber@TLrevolution.com"),
                     person("Mark", "van der Laan", role = "aut",
@@ -15,8 +15,8 @@ Depends: tmle (>= 2.0)
 Suggests: dbarts (>= 0.9-18), glmnet
 License: GPL-3
 Encoding: UTF-8
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.2
 NeedsCompilation: no
-Packaged: 2024-09-03 16:58:22 UTC; susan
+Packaged: 2025-02-05 15:44:13 UTC; susan
 Repository: CRAN
-Date/Publication: 2024-09-05 17:20:02 UTC
+Date/Publication: 2025-02-05 16:00:02 UTC
