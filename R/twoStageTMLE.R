@@ -246,8 +246,42 @@ twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   argList$obsWeights <- obsWeights[Delta.W==1]
   result$tmle_Pi_star <- try(do.call(tmle::tmle, argList))
 
+  # target non-centered full-data EIC regression -------------------------------
+  g1W <- result$tmle_Pi_star$g$g1W
+  Q0W <- result$tmle_Pi_star$Qstar[, "Q0W"]
+  Q1W <- result$tmle_Pi_star$Qstar[, "Q1W"]
+  QAW <- Q1W*A[Delta.W == 1]+Q0W*(1-A[Delta.W == 1])
+  DFullNC <- ((A[Delta.W == 1]/g1W-(1-A[Delta.W == 1])/(1-g1W)))*(Y[Delta.W == 1]-QAW)+Q1W-Q0W
+  DFullNCReg <- estimateDfullReg(DFull = DFullNC,
+                                 Delta = Delta.W,
+                                 V = res.twoStage$d.pi,
+                                 DFullbounds = c(-Inf, Inf),
+                                 DFullform = NULL,
+                                 SL.library = argList$Q.SL.library,
+                                 verbose = verbose,
+                                 discreteSL = TRUE,
+                                 Vfold = argList$V.Q)
+  H <- as.numeric(Delta.W/res.twoStage$pi)
+  epsilon <- coef(glm(DFullNCReg$DFullReg ~ H, family = "gaussian"))
+  epsilon[is.na(epsilon)] <- 0
+  DFullNCReg$DFullReg <- epsilon[1] + epsilon[2] * H
+
+  # point estimate and inference -----------------------------------------------
+  ATE <- mean(DFullNCReg$DFullReg)
+  DFull <- Q1W-Q0W-ATE+(A[Delta.W == 1]/g1W-(1-A[Delta.W == 1])/(1-g1W))*(Y[Delta.W == 1]-QAW)
+  DFull_aug <- numeric(length(Delta.W))
+  DFull_aug[Delta.W == 1] <- DFull
+  ipcw_wt <- Delta.W/res.twoStage$pi
+  EIC <- ipcw_wt*DFull_aug-(ipcw_wt-1)*DFullReg$DFullReg
+  se <- sqrt(var(EIC, na.rm = TRUE) / length(Delta.W))
+  CI <- numeric(2)
+  CI[1] <- ATE + qnorm(0.025) * se
+  CI[2] <- ATE + qnorm(0.975) * se
+
   result$twoStage <- res.twoStage
   result$augW <- W.Q
+  result$ATE <- ATE
+  result$CI <- CI
   class(result) <- "twoStageTMLE"  # for tmleMSM can use same class
   return(result)
 }

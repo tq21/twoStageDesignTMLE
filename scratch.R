@@ -11,15 +11,17 @@ sim_data <- function(n,
   W3 <- runif(n, 0, 1)
   W4 <- runif(n, 0, 1)
   W5 <- runif(n, 0, 1)
+  UY <- rnorm(n, 0, 0.5)
   if (A_counter == -1) {
     A <- rbinom(n, 1, plogis(-W1-W2+W3+W4))
   } else {
     A <- rep(A_counter, n)
   }
-  Y <- rbinom(n, 1, plogis(A-4*W1+A*W1-1.5*W2+W5))
+  #Y <- rbinom(n, 1, plogis(A-4*W1+A*W1-1.5*W2+W5))
   #Y <- rbinom(n, 1, plogis(A-4*W1+A*W1-1.5*W2+sin(W5)))
+  Y <- A-4*W1-1.5*W2+sin(W5)+UY
   #Delta <- rbinom(n, 1, plogis(1.3*W1-0.4*as.numeric(W2 > 0.5)+0.1*W3^2))
-  Delta <- rbinom(n, 1, plogis(-0.5))
+  Delta <- rbinom(n, 1, plogis(0.5))
   W5[Delta == 0] <- NA
 
   return(data.frame(W1 = W1,
@@ -39,9 +41,9 @@ get_truth <- function() {
 }
 
 set.seed(123)
-truth <- get_truth()
+truth <- 1
 
-B <- 500
+B <- 100
 n_seq <- 500#seq(500, 2000, 500)
 
 res_df <- map_dfr(n_seq, function(.n) {
@@ -58,8 +60,8 @@ res_df <- map_dfr(n_seq, function(.n) {
       Delta.W = data$Delta,
       condSetNames = c("W", "A", "Y"),
       pi.SL.library = "SL.glm", V.pi = 10,
-      Q.family = "binomial",
-      Q.SL.library = "SL.glm", V.Q = 10,
+      Q.family = "gaussian",
+      Q.SL.library = "SL.xgboost", V.Q = 5,
       g.SL.library = "SL.glm", V.g = 10,
       augmentW = FALSE,
       verbose = FALSE
@@ -67,10 +69,10 @@ res_df <- map_dfr(n_seq, function(.n) {
 
     return(data.frame(n = .n,
                       b = .b,
-                      est_name = c("IPCW-TMLE", "IPCW-TMLE-target-Pi"),
-                      psi = c(res_susan$tmle$estimates$ATE$psi, res_susan$tmle_Pi_star$estimates$ATE$psi),
-                      lower = c(res_susan$tmle$estimates$ATE$CI[1], res_susan$tmle_Pi_star$estimates$ATE$CI[1]),
-                      upper = c(res_susan$tmle$estimates$ATE$CI[2], res_susan$tmle_Pi_star$estimates$ATE$CI[2])))
+                      est_name = c("IPCW-TMLE", "IPCW-TMLE-target-Pi", "IPCW-TMLE-imputation"),
+                      psi = c(res_susan$tmle$estimates$ATE$psi, res_susan$tmle_Pi_star$estimates$ATE$psi, res_susan$ATE),
+                      lower = c(res_susan$tmle$estimates$ATE$CI[1], res_susan$tmle_Pi_star$estimates$ATE$CI[1], res_susan$CI[1]),
+                      upper = c(res_susan$tmle$estimates$ATE$CI[2], res_susan$tmle_Pi_star$estimates$ATE$CI[2], res_susan$CI[2])))
   })
 })
 
