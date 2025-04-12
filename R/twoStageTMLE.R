@@ -88,7 +88,7 @@
 #' \doi{doi:10.2202/1557-4679.1217}
 #' @export
 twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
-     Delta = rep(1, length(Y)), pi=NULL, piform=NULL,
+     Delta = rep(1, length(Y)), pi=NULL, piform=NULL, pi_oracle=NULL,
      pi.SL.library = c("SL.glm", "SL.gam", "SL.glmnet", "tmle.SL.dbarts.k.5"),
      V.pi=10,pi.discreteSL = TRUE, condSetNames = c("A","W","Y"), id = NULL,
      Q.family = "gaussian", augmentW = TRUE,
@@ -129,6 +129,9 @@ twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
                          pi.SL.library = pi.SL.library,  V = V.pi,
                          discreteSL = pi.discreteSL,
                          verbose=verbose, pi = pi)
+  if (!is.null(pi_oracle)) {
+    res.twoStage$pi <- pi_oracle
+  }
   # if (is.null(pi)){
   #   validCondSetNames <- c("A", "W","Y", colnames(W))
   #   if (!(all(condSetNames %in% validCondSetNames))) {
@@ -223,12 +226,13 @@ twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   cur_iter <- 1
   PnEIC <- Inf
   sn <- 0
-  dx <- 0.00001
-  max_iter <- 2000
+  dx <- 0.000001
+  max_iter <- 10000
+  print(mean(DFullReg$DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
   while (cur_iter <= max_iter & abs(PnEIC) > sn) {
     clever_cov <- DFullReg$DFullReg/as.numeric(res.twoStage$pi)
     PnEIC <- mean(clever_cov*(Delta.W-res.twoStage$pi))
-    res.twoStage$pi <- plogis(qlogis(res.twoStage$pi) + dx*sign(PnEIC)*clever_cov)
+    res.twoStage$pi <- plogis(.bound(qlogis(res.twoStage$pi) + dx*sign(PnEIC) + dx*sign(PnEIC)*clever_cov, c(-10, 10)))
     cur_iter <- cur_iter + 1
     eic <- eic(Delta = Delta.W,
                Pi = res.twoStage$pi,
@@ -237,6 +241,7 @@ twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
     sn <- 0.001*sqrt(var(eic, na.rm = TRUE))/(sqrt(length(Delta.W)) * log(length(Delta.W)))
     #print(PnEIC)
   }
+  print(mean(DFullReg$DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
 
   # rerun TMLE routine with updated Pi -----------------------------------------
   obsWeights <- Delta.W/res.twoStage$pi
@@ -261,10 +266,12 @@ twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
                                  verbose = verbose,
                                  discreteSL = TRUE,
                                  Vfold = argList$V.Q)
+  #print(mean(1/res.twoStage$pi[Delta.W == 1]*(DFullNC - DFullNCReg$DFullReg[Delta.W == 1]))) # CHECK
   H <- as.numeric(Delta.W/res.twoStage$pi)
-  epsilon <- coef(glm(DFullNCReg$DFullReg ~ H, family = "gaussian"))
+  epsilon <- coef(glm(DFullNC ~ -1 + offset(DFullNCReg$DFullReg[Delta.W == 1]) + H[Delta.W == 1], family = "gaussian"))
   epsilon[is.na(epsilon)] <- 0
-  DFullNCReg$DFullReg <- epsilon[1] + epsilon[2] * H
+  DFullNCReg$DFullReg[Delta.W == 1] <- DFullNCReg$DFullReg[Delta.W == 1] + epsilon * H[Delta.W == 1]
+  #print(mean(1/res.twoStage$pi[Delta.W == 1]*(DFullNC - DFullNCReg$DFullReg[Delta.W == 1]))) # CHECK
 
   # point estimate and inference -----------------------------------------------
   ATE <- mean(DFullNCReg$DFullReg)
