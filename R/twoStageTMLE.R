@@ -178,101 +178,82 @@ twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   #   res.twoStage$discreteSL <- NULL
   # }
 
-  result <- list()
-
-  # target Q, target Pi, relearn g and Q, then iterate
-  for (j in seq(target_pi_max_iter)) {
-    # target Q -----------------------------------------------------------------
-    # Bound normalized obsWeights after rescaling to sum to sum(Delta.W)
-    obsWeights <- Delta.W/res.twoStage$pi
-    obsWeights <- obsWeights / sum(obsWeights) * sum(Delta.W)
-    ub <- sqrt(sum(Delta.W)) * log(sum(Delta.W)) / 5
-    obsWeights <- .bound(Delta.W/res.twoStage$pi, c(0, ub))
-
-    # Set call to tmle on full data
-    argList <- list(...)
-    argList$Y <- Y[Delta.W==1]
-    argList$A <- A[Delta.W==1]
-    if (is.null(W.Q)){
-      argList$W <- cbind(W[Delta.W==1,, drop=FALSE], W.stage2)
-    } else {
-      argList$W <- cbind(W[Delta.W==1,, drop=FALSE], W.Q[Delta.W==1,], W.stage2)
-    }
-    argList$Z <- Z[Delta.W==1]
-    argList$Delta <- Delta[Delta.W==1]
-    argList$obsWeights <- obsWeights[Delta.W==1]
-    argList$id <- id[Delta.W==1]
-    argList$family <- Q.family
-    argList$verbose <- verbose
-    if (rareOutcome){
-      argList$Q.SL.library <- c("SL.glm", "SL.glmnet", "tmle.SL.dbarts2")
-      argList$Q.discreteSL <- TRUE
-      argList$V.Q <- 20
-    }
-    result[[paste0("tmle_", j-1)]] <- try(do.call(tmle::tmle, argList))
-
-    # target Pi ----------------------------------------------------------------
-    DFull <- as.numeric(result[[paste0("tmle_", j-1)]]$estimates$IC$IC.ATE)
-    DFullReg <- estimateDfullReg(DFull = DFull,
-                                 Delta = Delta.W,
-                                 V = res.twoStage$d.pi,
-                                 DFullbounds = c(-Inf, Inf),
-                                 DFullform = NULL,
-                                 SL.library = argList$Q.SL.library,
-                                 verbose = verbose,
-                                 discreteSL = TRUE,
-                                 Vfold = argList$V.Q)
-    cur_iter <- 1
-    PnEIC <- Inf
-    sn <- 0
-    dx <- 0.000001
-    max_iter <- 10000
-    Pi_star <- res.twoStage$pi
-    #print(mean(DFullReg$DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
-    while (cur_iter <= max_iter & abs(PnEIC) > sn) {
-      clever_cov <- DFullReg$DFullReg/as.numeric(Pi_star)
-      PnEIC <- mean(clever_cov*(Delta.W-Pi_star))
-      Pi_star <- plogis(.bound(qlogis(Pi_star) + dx*sign(PnEIC) + dx*sign(PnEIC)*clever_cov, c(-10, 10)))
-      cur_iter <- cur_iter + 1
-      eic <- eic(Delta = Delta.W,
-                 Pi = Pi_star,
-                 D_full = DFull,
-                 D_full_mean = DFullReg$DFullReg)
-      sn <- 0.001*sqrt(var(eic, na.rm = TRUE))/(sqrt(length(Delta.W)) * log(length(Delta.W)))
-      #print(PnEIC)
-    }
-    #print(mean(DFullReg$DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
-
-    # results without relearning g and Q using targeted Pi
-    g1W <- result[[paste0("tmle_", j-1)]]$g$g1W
-    Q1W <- result[[paste0("tmle_", j-1)]]$Qstar[, "Q1W"]
-    Q0W <- result[[paste0("tmle_", j-1)]]$Qstar[, "Q0W"]
-    QAW <- Q1W*A[Delta.W == 1]+Q0W*(1-A[Delta.W == 1])
-    psi <- sum(1/Pi_star[Delta.W == 1]*(Q1W-Q0W))/length(Delta.W)
-    DFull <- Q1W-Q0W-psi+(A[Delta.W == 1]/g1W-(1-A[Delta.W == 1])/(1-g1W))*(Y[Delta.W == 1]-QAW)
-    DFull_aug <- numeric(length(Delta.W))
-    DFull_aug[Delta.W == 1] <- DFull
-    ipcw_wt <- Delta.W/Pi_star
-    eic <- ipcw_wt*DFull_aug-(ipcw_wt-1)*DFullReg$DFullReg
-    se <- sqrt(var(eic, na.rm = TRUE) / length(Delta.W))
-    result[[paste0("tmle_target_Pi_", j)]] <- list(psi = psi,
-                                                   lower = psi + qnorm(0.025) * se,
-                                                   upper = psi + qnorm(0.975) * se)
-  }
-
-  # rerun TMLE routine with updated Pi -----------------------------------------
-  obsWeights <- Delta.W/Pi_star
+  # target Q -------------------------------------------------------------------
+  # Bound normalized obsWeights after rescaling to sum to sum(Delta.W)
+  obsWeights <- Delta.W/res.twoStage$pi
   obsWeights <- obsWeights / sum(obsWeights) * sum(Delta.W)
   ub <- sqrt(sum(Delta.W)) * log(sum(Delta.W)) / 5
-  obsWeights <- .bound(Delta.W/Pi_star, c(0, ub))
+  obsWeights <- .bound(Delta.W/res.twoStage$pi, c(0, ub))
+
+  # Set call to tmle on full data
+  argList <- list(...)
+  argList$Y <- Y[Delta.W==1]
+  argList$A <- A[Delta.W==1]
+  if (is.null(W.Q)){
+    argList$W <- cbind(W[Delta.W==1,, drop=FALSE], W.stage2)
+  } else {
+    argList$W <- cbind(W[Delta.W==1,, drop=FALSE], W.Q[Delta.W==1,], W.stage2)
+  }
+  argList$Z <- Z[Delta.W==1]
+  argList$Delta <- Delta[Delta.W==1]
   argList$obsWeights <- obsWeights[Delta.W==1]
-  result[[paste0("tmle_", target_pi_max_iter)]] <- try(do.call(tmle::tmle, argList))
+  argList$id <- id[Delta.W==1]
+  argList$family <- Q.family
+  argList$verbose <- verbose
+  if (rareOutcome){
+    argList$Q.SL.library <- c("SL.glm", "SL.glmnet", "tmle.SL.dbarts2")
+    argList$Q.discreteSL <- TRUE
+    argList$V.Q <- 20
+  }
+  result <- list()
+  result$tmle <- try(do.call(tmle::tmle, argList))
+
+  # target Pi ------------------------------------------------------------------
+  DFull <- as.numeric(result$tmle$estimates$IC$IC.ATE)
+  DFullReg <- estimateDfullReg(DFull = DFull,
+                               Delta = Delta.W,
+                               V = res.twoStage$d.pi,
+                               DFullbounds = c(-Inf, Inf),
+                               DFullform = NULL,
+                               SL.library = argList$Q.SL.library,
+                               verbose = verbose,
+                               discreteSL = TRUE,
+                               Vfold = argList$V.Q)
+  cur_iter <- 1
+  PnEIC <- Inf
+  sn <- 0
+  dx <- 0.000001
+  max_iter <- 10000
+  #print(mean(DFullReg$DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
+  while (cur_iter <= max_iter & abs(PnEIC) > sn) {
+    clever_cov <- DFullReg$DFullReg/as.numeric(res.twoStage$pi)
+    PnEIC <- mean(clever_cov*(Delta.W-res.twoStage$pi))
+    res.twoStage$pi <- plogis(.bound(qlogis(res.twoStage$pi) + dx*sign(PnEIC) + dx*sign(PnEIC)*clever_cov, c(-10, 10)))
+    cur_iter <- cur_iter + 1
+    eic <- eic(Delta = Delta.W,
+               Pi = res.twoStage$pi,
+               D_full = DFull,
+               D_full_mean = DFullReg$DFullReg)
+    sn <- 0.001*sqrt(var(eic, na.rm = TRUE))/(sqrt(length(Delta.W)) * log(length(Delta.W)))
+    #print(PnEIC)
+  }
+  #print(mean(DFullReg$DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
+  g1W <- result$tmle$g$g1W
+  Q1W <- result$tmle$Qstar[, "Q1W"]
+  Q0W <- result$tmle$Qstar[, "Q0W"]
+  QAW <- Q1W*A[Delta.W == 1]+Q0W*(1-A[Delta.W == 1])
+  psi <- sum(1/as.numeric(res.twoStage$pi)[Delta.W == 1]*(Q1W-Q0W))/length(Delta.W)
+  DFull <- Q1W-Q0W-psi+(A[Delta.W == 1]/g1W-(1-A[Delta.W == 1])/(1-g1W))*(Y[Delta.W == 1]-QAW)
+  DFull_aug <- numeric(length(Delta.W))
+  DFull_aug[Delta.W == 1] <- DFull
+  ipcw_wt <- Delta.W/as.numeric(res.twoStage$pi)
+  eic <- ipcw_wt*DFull_aug-(ipcw_wt-1)*DFullReg$DFullReg
+  se <- sqrt(var(eic, na.rm = TRUE) / length(Delta.W))
+  result$tmle_Pi <- list(psi = psi,
+                         lower = psi + qnorm(0.025) * se,
+                         upper = psi + qnorm(0.975) * se)
 
   # target non-centered full-data EIC regression -------------------------------
-  g1W <- result[[paste0("tmle_", target_pi_max_iter)]]$g$g1W
-  Q0W <- result[[paste0("tmle_", target_pi_max_iter)]]$Qstar[, "Q0W"]
-  Q1W <- result[[paste0("tmle_", target_pi_max_iter)]]$Qstar[, "Q1W"]
-  QAW <- Q1W*A[Delta.W == 1]+Q0W*(1-A[Delta.W == 1])
   DFullNC <- ((A[Delta.W == 1]/g1W-(1-A[Delta.W == 1])/(1-g1W)))*(Y[Delta.W == 1]-QAW)+Q1W-Q0W
   DFullNCReg <- estimateDfullReg(DFull = DFullNC,
                                  Delta = Delta.W,
@@ -291,21 +272,19 @@ twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   #print(mean(1/res.twoStage$pi[Delta.W == 1]*(DFullNC - DFullNCReg$DFullReg[Delta.W == 1]))) # CHECK
 
   # point estimate and inference -----------------------------------------------
-  ATE <- mean(DFullNCReg$DFullReg)
-  DFull <- Q1W-Q0W-ATE+(A[Delta.W == 1]/g1W-(1-A[Delta.W == 1])/(1-g1W))*(Y[Delta.W == 1]-QAW)
+  psi <- mean(DFullNCReg$DFullReg)
+  DFull <- Q1W-Q0W-psi+(A[Delta.W == 1]/g1W-(1-A[Delta.W == 1])/(1-g1W))*(Y[Delta.W == 1]-QAW)
   DFull_aug <- numeric(length(Delta.W))
   DFull_aug[Delta.W == 1] <- DFull
   ipcw_wt <- Delta.W/res.twoStage$pi
-  EIC <- ipcw_wt*DFull_aug-(ipcw_wt-1)*DFullReg$DFullReg
-  se <- sqrt(var(EIC, na.rm = TRUE) / length(Delta.W))
-  CI <- numeric(2)
-  CI[1] <- ATE + qnorm(0.025) * se
-  CI[2] <- ATE + qnorm(0.975) * se
+  eic <- ipcw_wt*DFull_aug-(ipcw_wt-1)*DFullReg$DFullReg
+  se <- sqrt(var(eic, na.rm = TRUE) / length(Delta.W))
 
   result$twoStage <- res.twoStage
   result$augW <- W.Q
-  result$ATE <- ATE
-  result$CI <- CI
+  result$tmle_Pi_impute <- list(psi = psi,
+                                lower = psi + qnorm(0.025) * se,
+                                upper = psi + qnorm(0.975) * se)
   class(result) <- "twoStageTMLE"  # for tmleMSM can use same class
   return(result)
 }
