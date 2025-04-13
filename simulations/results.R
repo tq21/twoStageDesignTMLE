@@ -1,6 +1,6 @@
 library(dplyr)
 
-res_df <- read.csv("out/Y_1_Delta_1.1_0412_211440.csv")
+res_df <- read.csv("out/Y_1_Delta_1_0412_213000.csv")
 truth <- 0.4
 res_df %>%
   summarize(abs_bias = abs(mean(psi - truth)),

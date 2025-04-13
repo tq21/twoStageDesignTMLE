@@ -7,7 +7,7 @@ sim_data <- function(n,
   W3 <- runif(n, -1, 1)
   W4 <- runif(n, -1, 1)
   W5 <- runif(n, -1, 1)
-  UY <- rnorm(n, 0, 1)
+  UY <- rnorm(n, 0, 2)
   if (A_counter == -1) {
     A <- rbinom(n, 1, plogis(-W1-W2+W3+W4))
   } else {
@@ -16,10 +16,10 @@ sim_data <- function(n,
 
   if (Y_type == 1.0) {
     # gaussian, linear, canonical
-    Y <- 0.1+0.4*A-W1-0.8*W2-0.8*W5+UY
+    Y <- 0.4*A-W1-0.8*W2-0.8*W5+UY
   } else if (Y_type == 1.1) {
     # gaussian, linear, small effect size
-    Y <- 0.1+0.1*A-W1-0.8*W2-0.8*W5+UY
+    Y <- 0.1*A-W1-0.8*W2-0.8*W5+UY
   } else if (Y_type == 2.0) {
     # binomial, logit linear, canonical
     Y <- rbinom(n, 1, plogis(A-4*W1-1.5*W2+W5))

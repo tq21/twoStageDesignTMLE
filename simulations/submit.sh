@@ -26,5 +26,7 @@ module load r
 
 R CMD BATCH --no-save run_Y_1.0_Delta_1.0.R logs/run_Y_1.0_Delta_1.0.Rout &
 R CMD BATCH --no-save run_Y_1.0_Delta_1.1.R logs/run_Y_1.0_Delta_1.1.Rout &
+R CMD BATCH --no-save run_Y_1.1_Delta_1.0.R logs/run_Y_1.1_Delta_1.0.Rout &
+R CMD BATCH --no-save run_Y_1.1_Delta_1.1.R logs/run_Y_1.1_Delta_1.1.Rout &
 
 wait
