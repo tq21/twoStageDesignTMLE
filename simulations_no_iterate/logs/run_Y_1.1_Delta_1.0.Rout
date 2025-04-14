@@ -61,7 +61,7 @@ Welcome to the twoStageDesignTMLE package
 Use twoStageDesignTMLENews() to see details on changes and bug fixes
 > timestamp <- format(Sys.Date(), "%m%d") %+% "_" %+% format(Sys.time(), "%H%M%S")
 > 
-> Y_type <- 1.0
+> Y_type <- 1.1
 > Delta_type <- 1.0
 > res_df <- run(Y_type = Y_type, Delta_type = Delta_type)
 [1] "n: 1000, b: 1..."
@@ -2443,7 +2443,3 @@ Use twoStageDesignTMLENews() to see details on changes and bug fixes
 [1] "n: 5000, b: 377..."
 [1] "n: 5000, b: 378..."
 [1] "n: 5000, b: 379..."
-[1] "n: 5000, b: 380..."
-[1] "n: 5000, b: 381..."
-[1] "n: 5000, b: 382..."
-[1] "n: 5000, b: 383..."
