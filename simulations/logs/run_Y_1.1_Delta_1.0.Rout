@@ -61,8 +61,8 @@ Welcome to the twoStageDesignTMLE package
 Use twoStageDesignTMLENews() to see details on changes and bug fixes
 > timestamp <- format(Sys.Date(), "%m%d") %+% "_" %+% format(Sys.time(), "%H%M%S")
 > 
-> Y_type <- 1.0
-> Delta_type <- 1.1
+> Y_type <- 1.1
+> Delta_type <- 1.0
 > res_df <- run(Y_type = Y_type, Delta_type = Delta_type)
 [1] "n: 2000, b: 1..."
 [1] "n: 2000, b: 2..."
