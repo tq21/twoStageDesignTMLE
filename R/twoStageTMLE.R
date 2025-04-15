@@ -88,7 +88,8 @@
 #' \doi{doi:10.2202/1557-4679.1217}
 #' @export
 twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
-     Delta = rep(1, length(Y)), pi=NULL, piform=NULL, pi_oracle=NULL, target_pi_max_iter=1,
+     Delta = rep(1, length(Y)), pi=NULL, piform=NULL, pi_oracle=NULL,
+     DFullReg_true = NULL,
      pi.SL.library = c("SL.glm", "SL.gam", "SL.glmnet", "tmle.SL.dbarts.k.5"),
      V.pi=10,pi.discreteSL = TRUE, condSetNames = c("A","W","Y"), id = NULL,
      Q.family = "gaussian", augmentW = TRUE,
@@ -219,6 +220,52 @@ twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
                                verbose = verbose,
                                discreteSL = TRUE,
                                Vfold = argList$V.Q)
+  DFullReg <- DFullReg$DFullReg
+
+  if (!is.null(DFullReg_true)) {
+    # target using the true DFullReg
+    # pi_tmp <- res.twoStage$pi
+    # clever_cov <- DFullReg_true/pi_tmp
+    # epsilon <- coef(glm(Delta.W ~ -1 + offset(qlogis(pi_tmp)) + clever_cov, family = "quasibinomial"))
+    # epsilon[is.na(epsilon)] <- 0
+    # pi_tmp <- plogis(qlogis(pi_tmp) + epsilon[1] * clever_cov)
+    cur_iter <- 1
+    PnEIC <- Inf
+    sn <- 0
+    dx <- 0.000001
+    max_iter <- 10000
+    #print(mean(DFullReg$DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
+    pi_tmp <- res.twoStage$pi
+    while (cur_iter <= max_iter & abs(PnEIC) > sn) {
+      clever_cov <- DFullReg/as.numeric(pi_tmp)
+      PnEIC <- mean(clever_cov*(Delta.W-pi_tmp))
+      pi_tmp <- plogis(.bound(qlogis(pi_tmp) + dx*sign(PnEIC) + dx*sign(PnEIC)*clever_cov, c(-10, 10)))
+      cur_iter <- cur_iter + 1
+      eic <- eic(Delta = Delta.W,
+                 Pi = pi_tmp,
+                 D_full = DFull,
+                 D_full_mean = DFullReg)
+      sn <- 0.001*sqrt(var(eic, na.rm = TRUE))/(sqrt(length(Delta.W)) * log(length(Delta.W)))
+      #print(PnEIC)
+    }
+    #print(mean(DFullReg$DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
+    g1W <- result$tmle$g$g1W
+    Q1W <- result$tmle$Qstar[, "Q1W"]
+    Q0W <- result$tmle$Qstar[, "Q0W"]
+    QAW <- Q1W*A[Delta.W == 1]+Q0W*(1-A[Delta.W == 1])
+    psi <- sum(1/as.numeric(pi_tmp)[Delta.W == 1]*(Q1W-Q0W))/length(Delta.W)
+    DFull <- Q1W-Q0W-psi+(A[Delta.W == 1]/g1W-(1-A[Delta.W == 1])/(1-g1W))*(Y[Delta.W == 1]-QAW)
+    DFull_aug <- numeric(length(Delta.W))
+    DFull_aug[Delta.W == 1] <- DFull
+    ipcw_wt <- Delta.W/as.numeric(pi_tmp)
+    eic <- ipcw_wt*DFull_aug-(ipcw_wt-1)*DFullReg
+    se <- sqrt(var(eic, na.rm = TRUE) / length(Delta.W))
+    result$tmle_Pi_DFullReg_true <- list(psi = psi,
+                                         lower = psi + qnorm(0.025) * se,
+                                         upper = psi + qnorm(0.975) * se)
+  }
+
+  # target Pi using the estimated DFullReg
   cur_iter <- 1
   PnEIC <- Inf
   sn <- 0
@@ -226,14 +273,14 @@ twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   max_iter <- 10000
   #print(mean(DFullReg$DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
   while (cur_iter <= max_iter & abs(PnEIC) > sn) {
-    clever_cov <- DFullReg$DFullReg/as.numeric(res.twoStage$pi)
+    clever_cov <- DFullReg/as.numeric(res.twoStage$pi)
     PnEIC <- mean(clever_cov*(Delta.W-res.twoStage$pi))
     res.twoStage$pi <- plogis(.bound(qlogis(res.twoStage$pi) + dx*sign(PnEIC) + dx*sign(PnEIC)*clever_cov, c(-10, 10)))
     cur_iter <- cur_iter + 1
     eic <- eic(Delta = Delta.W,
                Pi = res.twoStage$pi,
                D_full = DFull,
-               D_full_mean = DFullReg$DFullReg)
+               D_full_mean = DFullReg)
     sn <- 0.001*sqrt(var(eic, na.rm = TRUE))/(sqrt(length(Delta.W)) * log(length(Delta.W)))
     #print(PnEIC)
   }
@@ -247,7 +294,7 @@ twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   DFull_aug <- numeric(length(Delta.W))
   DFull_aug[Delta.W == 1] <- DFull
   ipcw_wt <- Delta.W/as.numeric(res.twoStage$pi)
-  eic <- ipcw_wt*DFull_aug-(ipcw_wt-1)*DFullReg$DFullReg
+  eic <- ipcw_wt*DFull_aug-(ipcw_wt-1)*DFullReg
   se <- sqrt(var(eic, na.rm = TRUE) / length(Delta.W))
   result$tmle_Pi <- list(psi = psi,
                          lower = psi + qnorm(0.025) * se,
@@ -277,7 +324,7 @@ twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   DFull_aug <- numeric(length(Delta.W))
   DFull_aug[Delta.W == 1] <- DFull
   ipcw_wt <- Delta.W/res.twoStage$pi
-  eic <- ipcw_wt*DFull_aug-(ipcw_wt-1)*DFullReg$DFullReg
+  eic <- ipcw_wt*DFull_aug-(ipcw_wt-1)*DFullReg
   se <- sqrt(var(eic, na.rm = TRUE) / length(Delta.W))
 
   result$twoStage <- res.twoStage

@@ -2,8 +2,8 @@ library(dplyr)
 library(knitr)
 library(kableExtra)
 
-res_df <- read.csv("out/Y_1.1_Delta_1_0413_150212.csv")
-truth <- 0.1
+res_df <- read.csv("out/0415_144326.csv")
+truth <- 0.4
 res_df %>%
   summarize(
     abs_bias = abs(mean(psi - truth)),
@@ -13,7 +13,4 @@ res_df %>%
     coverage = mean((lower <= truth) & (truth <= upper)),
     power = mean((lower >= 0) & (0 <= upper)),
     .by = c("n", "est_name")
-  ) %>%
-  mutate(across(c(abs_bias, se, mse), ~ formatC(.x, format = "e", digits = 2))) %>%
-  kable(format = "latex", booktabs = TRUE, escape = FALSE, caption = "") %>%
-  kable_styling(latex_options = c("striped", "hold_position"))
+  )
