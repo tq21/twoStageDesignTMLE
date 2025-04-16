@@ -87,16 +87,16 @@
 #' Two-Stage Designs. \emph{Int J Biostat.} 2011 Jan 1; 7(1): 17.
 #' \doi{doi:10.2202/1557-4679.1217}
 #' @export
-twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
-                         Delta = rep(1, length(Y)), pi=NULL, piform=NULL, pi_oracle=NULL,
-                         DFullReg_true = NULL,
-                         pi.SL.library = c("SL.glm", "SL.gam", "SL.glmnet", "tmle.SL.dbarts.k.5"),
-                         DFullReg.library = c("tmle.SL.dbarts2"),
-                         V.pi=10,pi.discreteSL = TRUE, condSetNames = c("A","W","Y"), id = NULL,
-                         Q.family = "gaussian", augmentW = TRUE,
-                         augW.SL.library = c("SL.glm", "SL.glmnet", "tmle.SL.dbarts2"),
-                         rareOutcome=FALSE,
-                         verbose=FALSE, browse=FALSE, ...) {
+twoStageTMLE_target_Pi <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
+                                   Delta = rep(1, length(Y)), pi=NULL, piform=NULL, pi_oracle=NULL,
+                                   DFullReg_true = NULL,
+                                   pi.SL.library = c("SL.glm", "SL.gam", "SL.glmnet", "tmle.SL.dbarts.k.5"),
+                                   DFullReg.library = c("tmle.SL.dbarts2"),
+                                   V.pi=10, pi.discreteSL = TRUE, condSetNames = c("A","W","Y"), id = NULL,
+                                   Q.family = "gaussian", augmentW = TRUE,
+                                   augW.SL.library = c("SL.glm", "SL.glmnet", "tmle.SL.dbarts2"),
+                                   rareOutcome=FALSE,
+                                   verbose=FALSE, browse=FALSE, ...) {
 
   if (browse) browser()
 
@@ -134,51 +134,6 @@ twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   if (!is.null(pi_oracle)) {
     res.twoStage$pi <- pi_oracle
   }
-  # if (is.null(pi)){
-  #   validCondSetNames <- c("A", "W","Y", colnames(W))
-  #   if (!(all(condSetNames %in% validCondSetNames))) {
-  #     stop("condSetNames must be any combination of 'A', 'Y', specific column
-  #     names in W, or 'W' to include all columns.")
-  #   }
-  #   if (any(condSetNames == "Y")){
-  #     if (any(is.na(Y))){
-  #       stop("Cannot condition on the outcome to evaluate sampling probabilities
-  #            when some outcome values are missing")
-  #     }
-  #   }
-  #
-  #   if(is.null(W.Q)){
-  #       d.pi <- data.frame(Delta.W = Delta.W, mget(condSetNames))
-  #       colnames(d.pi)[-1] <- temp <- .getColNames(condSetNames,
-  #                                c(colnames(W)), colnames(V))
-  #     } else {
-  #       d.pi <- data.frame(Delta.W = Delta.W, mget(condSetNames), W.Q)
-  #       colnames(d.pi)[-1] <- .getColNames(condSetNames,
-  #                                c(colnames(W), colnames(W.Q)), colnames(V))
-  #     }
-  #   # stop if  piform includes Y on the right hand side
-  #   # (don't automatically replace because too difficult if interaction terms are in
-  #   # the model)
-  #   if(!is.null(piform)){
-  #     varNames <- as.character(attr(terms(as.formula(piform)), "variables"))[-(1:2)]
-  #     if ("Y" %in% varNames) {
-  #       stop("Error in specified parametric formula for evaluating sampling
-  #            probabilities. To condition on Y use 'Y.orig' on the right hand side
-  #            of the regression formula")
-  #     }
-  #   }
-  #   res.twoStage <- tmle::estimateG(d = d.pi, g1W=NULL, gform = piform,
-  #       SL.library = pi.SL.library, id=id, V=V.pi, message = "sampling weights",
-  #       outcome = "A",discreteSL = pi.discreteSL, obsWeights = rep(1, nrow(W)),
-  #       verbose=verbose)
-  #   names(res.twoStage)[1] <- "pi"
-  # } else {
-  #   res.twoStage <- list()
-  #   res.twoStage$pi <- pi
-  #   res.twoStage$type <- "User supplied values"
-  #   res.twoStage$coef <- NA
-  #   res.twoStage$discreteSL <- NULL
-  # }
 
   # target Q -------------------------------------------------------------------
   # Bound normalized obsWeights after rescaling to sum to sum(Delta.W)
@@ -225,97 +180,62 @@ twoStageTMLE <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   DFullReg <- DFullReg$DFullReg
   DFullReg_R2 <- 1 - sum((DFull-DFullReg[Delta.W == 1])^2)/sum((DFull-mean(DFull))^2)
   result$DFullReg_R2 <- DFullReg_R2
-  browser()
 
   # TMLE of Pi w/ clever cov DFullReg/Pi and intercept
   cur_iter <- 1
-  PnEIC <- Inf
   sn <- 0
-  dx <- 0.000001
+  dx <- 0.0000001
   max_iter <- 10000
-  #print(mean(DFullReg$DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
-  while (cur_iter <= max_iter & abs(PnEIC) > sn) {
+  clever_cov <- DFullReg/as.numeric(res.twoStage$pi)
+  PnEIC_prev <- mean(clever_cov*(Delta.W-res.twoStage$pi))
+  prev_pos <- PnEIC_prev >= 0
+  #print(mean(DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
+  while (cur_iter <= max_iter & abs(PnEIC_prev) > sn) {
     clever_cov <- DFullReg/as.numeric(res.twoStage$pi)
-    PnEIC <- mean(clever_cov*(Delta.W-res.twoStage$pi))
-    res.twoStage$pi <- plogis(.bound(qlogis(res.twoStage$pi) + dx*sign(PnEIC) + dx*sign(PnEIC)*clever_cov, c(-10, 10)))
+
+    # if signs flip, reduce step size
+    cur_pos <- PnEIC_prev >= 0
+    if (cur_pos != prev_pos) {
+      dx <- dx/10
+    }
+    prev_pos <- cur_pos
+
+    # if PnEIC diff to small, increase step size
+    PnEIC_cur <- mean(clever_cov*(Delta.W-res.twoStage$pi))
+    if (abs(PnEIC_cur - PnEIC_prev) < 1e-6) {
+      dx <- dx*10
+    }
+    PnEIC_prev <- PnEIC_cur
+
+    res.twoStage$pi <- plogis(.bound(qlogis(res.twoStage$pi) + dx*sign(PnEIC_cur)*clever_cov, c(-10, 10)))
     cur_iter <- cur_iter + 1
     eic <- eic(Delta = Delta.W,
                Pi = res.twoStage$pi,
                D_full = DFull,
                D_full_mean = DFullReg)
     sn <- 0.001*sqrt(var(eic, na.rm = TRUE))/(sqrt(length(Delta.W)) * log(length(Delta.W)))
-    #print(PnEIC)
+    #print(PnEIC_prev)
   }
-  #print(mean(DFullReg$DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
+  #print(mean(DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
 
   # re-target Q* using the targeted Pi
-  browser()
   obsWeights <- Delta.W/res.twoStage$pi
   obsWeights <- obsWeights / sum(obsWeights) * sum(Delta.W)
   ub <- sqrt(sum(Delta.W)) * log(sum(Delta.W)) / 5
   obsWeights <- .bound(Delta.W/res.twoStage$pi, c(0, ub))
   argList$obsWeights <- obsWeights[Delta.W == 1]
-  argList$Q <- result$tmle$Qstar
   argList$g1W <- result$tmle$g$g1W
-  result$tmle_target_Pi <- try(do.call(tmle::tmle, argList))
 
+  # use Q initial
+  argList$Q <- result$tmle$Qinit$Q
+  result$tmle_target_Pi_Q_init <- try(do.call(tmle::tmle, argList))
 
-  # g1W <- result$tmle$g$g1W
-  # Q1W <- result$tmle$Qstar[, "Q1W"]
-  # Q0W <- result$tmle$Qstar[, "Q0W"]
-  # QAW <- Q1W*A[Delta.W == 1]+Q0W*(1-A[Delta.W == 1])
-  # psi <- sum(1/as.numeric(res.twoStage$pi)[Delta.W == 1]*(Q1W-Q0W))/length(Delta.W)
-  # DFull <- Q1W-Q0W-psi+(A[Delta.W == 1]/g1W-(1-A[Delta.W == 1])/(1-g1W))*(Y[Delta.W == 1]-QAW)
-  # DFull_aug <- numeric(length(Delta.W))
-  # DFull_aug[Delta.W == 1] <- DFull
-  # ipcw_wt <- Delta.W/as.numeric(res.twoStage$pi)
-  # eic <- ipcw_wt*DFull_aug-(ipcw_wt-1)*DFullReg
-  # se <- sqrt(var(eic, na.rm = TRUE) / length(Delta.W))
-  # result$tmle_Pi <- list(psi = psi,
-  #                        lower = psi + qnorm(0.025) * se,
-  #                        upper = psi + qnorm(0.975) * se)
-
-  # target non-centered full-data EIC regression -------------------------------
-  DFullNC <- ((A[Delta.W == 1]/g1W-(1-A[Delta.W == 1])/(1-g1W)))*(Y[Delta.W == 1]-QAW)+Q1W-Q0W
-  DFullNCReg <- estimateDfullReg(DFull = DFullNC,
-                                 Delta = Delta.W,
-                                 V = res.twoStage$d.pi,
-                                 DFullbounds = c(-Inf, Inf),
-                                 DFullform = NULL,
-                                 SL.library = DFullReg.library,
-                                 verbose = verbose,
-                                 discreteSL = FALSE,
-                                 Vfold = argList$V.Q)
-
-  # compute R^2 of the regression fit
-  #r_squared <- 1 - sum((DFullNC-DFullNCReg$DFullReg[Delta.W == 1])^2)/sum((DFullNC-mean(DFullNC))^2)
-  #print(r_squared)
-
-  #print(mean(1/res.twoStage$pi[Delta.W == 1]*(DFullNC - DFullNCReg$DFullReg[Delta.W == 1]))) # CHECK PT
-  H <- as.numeric(Delta.W/res.twoStage$pi)
-  epsilon <- coef(glm(DFullNC ~ -1 + offset(DFullNCReg$DFullReg[Delta.W == 1]) + H[Delta.W == 1], family = "gaussian"))
-  epsilon[is.na(epsilon)] <- 0
-  DFullNCReg$DFullReg[Delta.W == 1] <- DFullNCReg$DFullReg[Delta.W == 1] + epsilon * H[Delta.W == 1]
-  #print(mean(1/res.twoStage$pi[Delta.W == 1]*(DFullNC - DFullNCReg$DFullReg[Delta.W == 1]))) # CHECK PT
-
-  # point estimate and inference -----------------------------------------------
-  psi <- mean(DFullNCReg$DFullReg)
-  DFullNCaug <- numeric(length(Delta.W))
-  DFullNCaug[Delta.W == 1] <- DFullNC
-
-  #print(mean(Delta.W/res.twoStage$pi*(DFullNCaug-DFullNCReg$DFullReg)))
-
-  eic <- Delta.W/res.twoStage$pi*(DFullNCaug-DFullNCReg$DFullReg)+DFullNCReg$DFullReg-psi
-
-  # eic <- ipcw_wt*DFull_aug-(ipcw_wt-1)*DFullReg
-  se <- sqrt(var(eic, na.rm = TRUE) / length(Delta.W))
-  #print(mean(eic)) # CHECK PT
+  # use Q*
+  argList$Q <- result$tmle$Qstar
+  result$tmle_target_Pi_Q_star <- try(do.call(tmle::tmle, argList))
 
   result$twoStage <- res.twoStage
   result$augW <- W.Q
-  result$impute <- list(psi = psi,
-                        lower = psi + qnorm(0.025) * se,
-                        upper = psi + qnorm(0.975) * se)
   class(result) <- "twoStageTMLE"  # for tmleMSM can use same class
   return(result)
 }
