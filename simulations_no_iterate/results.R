@@ -2,8 +2,8 @@ library(dplyr)
 library(knitr)
 library(kableExtra)
 
-res_df <- read.csv("out/Y_1.1_Delta_1_0413_150212.csv")
-truth <- 0.1
+res_df <- read.csv("out/Y_1_Delta_1.1_0415_233521.csv")
+truth <- 0.4
 res_df %>%
   summarize(
     abs_bias = abs(mean(psi - truth)),

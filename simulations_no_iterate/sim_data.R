@@ -30,20 +30,23 @@ sim_data <- function(n,
 
   if (Delta_type == 1.0) {
     # 50% missing, logit linear
-    Delta <- rbinom(n, 1, plogis(-0.5*W1+0.5*W2))
+    Pi <- plogis(-0.5*W1+0.5*W2)
+    Delta <- rbinom(n, 1, Pi)
   } else if (Delta_type == 1.1) {
     # 50% missing, logit linear, strongly predictive
-    Delta <- rbinom(n, 1, plogis(-6*W1+6*W2))
+    Pi <- plogis(-6*W1+6*W2)
+    Delta <- rbinom(n, 1, Pi)
   }
 
   W5[Delta == 0] <- NA
 
-  return(data.frame(W1 = W1,
-                    W2 = W2,
-                    W3 = W3,
-                    W4 = W4,
-                    W5 = W5,
-                    A = A,
-                    Y = Y,
-                    Delta = Delta))
+  return(list(data = data.frame(W1 = W1,
+                                W2 = W2,
+                                W3 = W3,
+                                W4 = W4,
+                                W5 = W5,
+                                A = A,
+                                Y = Y,
+                                Delta = Delta),
+              Pi = Pi))
 }
