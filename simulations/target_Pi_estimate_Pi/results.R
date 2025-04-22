@@ -3,8 +3,8 @@ library(knitr)
 library(kableExtra)
 source("sim_data.R")
 
-res_df <- read.csv("out/Y_simple_binomial_Delta_med_0416_153958.csv")
-truth <- get_truth(Y_type = "simple_binomial")
+res_df <- read.csv("out/Y_simple_gaussian_Delta_med_strong_0416_165640.csv")
+truth <- get_truth(Y_type = "simple_gaussian")
 res_df %>%
   summarize(
     abs_bias = abs(mean(psi - truth)),

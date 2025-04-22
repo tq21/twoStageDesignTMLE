@@ -11,7 +11,7 @@ run <- function(Y_type,
                 true_Pi,
                 Q.family) {
   B <- 50
-  n_seq <- 1000#seq(1000, 4000, 1000)
+  n_seq <- 2000#seq(1000, 4000, 1000)
 
   res_df <- map_dfr(n_seq, function(.n) {
     map_dfr(seq(B), function(.b) {
@@ -36,18 +36,26 @@ run <- function(Y_type,
       if (true_Pi) {
         call_args$pi_oracle <- Pi
       }
-      res <- do.call("twoStageTMLE_target_Pi", call_args)
+      res <- do.call("twoStageTMLE_target_Pi_DFullReg", call_args)
+
+      print("IPCW-TMLE: " %+% res$tmle$estimates$ATE$psi)
+      print("IPCW-TMLE-target-Pi: " %+% res$tmle_target_Pi_Q_init$estimates$ATE$psi)
+      print("IPCW-TMLE-target-Pi-DFullReg: " %+% res$impute$psi)
 
       return(data.frame(n = .n,
                         b = .b,
                         est_name = c("IPCW-TMLE",
-                                     "IPCW-TMLE-target-Pi"),
+                                     "IPCW-TMLE-target-Pi",
+                                     "IPCW-TMLE-target-Pi-DFullReg"),
                         psi = c(res$tmle$estimates$ATE$psi,
-                                res$tmle_target_Pi$estimates$ATE$psi),
+                                res$tmle_target_Pi_Q_init$estimates$ATE$psi,
+                                res$impute$psi),
                         lower = c(res$tmle$estimates$ATE$CI[1],
-                                  res$lower),
+                                  res$tmle_target_Pi_Q_init$estimates$ATE$CI[1],
+                                  res$impute$lower),
                         upper = c(res$tmle$estimates$ATE$CI[2],
-                                  res$upper)))
+                                  res$tmle_target_Pi_Q_init$estimates$ATE$CI[2],
+                                  res$impute$upper)))
     })
   })
 
