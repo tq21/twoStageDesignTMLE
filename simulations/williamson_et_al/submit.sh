@@ -13,7 +13,7 @@
 #
 # Number of nodes for use case:
 #SBATCH --nodes=1
-#SBATCH --ntasks=3
+#SBATCH --ntasks=4
 #SBATCH --cpus-per-task=1
 #
 # Mail type:
@@ -27,5 +27,6 @@ module load r
 R CMD BATCH --no-save run_ver_0.R logs/run_ver_0.Rout &
 R CMD BATCH --no-save run_ver_1.R logs/run_ver_1.Rout &
 R CMD BATCH --no-save run_ver_2.R logs/run_ver_2.Rout &
+R CMD BATCH --no-save run_ver_3.R logs/run_ver_3.Rout &
 
 wait

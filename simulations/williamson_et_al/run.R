@@ -18,7 +18,7 @@ source("src_williamson_et_al/02_methods_tmle.R")
 source("src_williamson_et_al/03_estimate.R")
 set.seed(123)
 
-B <- 200
+B <- 500
 n_seq <- seq(500, 2000, 500)
 
 run <- function(est_name) {
@@ -33,6 +33,8 @@ run <- function(est_name) {
         estimators <- c("ipcw-tmle-ver-1", estimators)
       } else if (est_name == "ver_2") {
         estimators <- c("ipcw-tmle-ver-2", estimators)
+      } else if (est_name == "ver_3") {
+        estimators <- c("ipcw-tmle-ver-3", estimators)
       }
 
       res <- investigate_performance_once(mc_id = 1,
@@ -40,7 +42,7 @@ run <- function(est_name) {
                                           XScenario = 1.6,
                                           YScenario = 4.17,
                                           missScenario = 1,
-                                          lowcor = 0.1, midcor = 0.4, highcor = 0.7, gencor = 0.2,
+                                          lowcor = 0, midcor = 0, highcor = 0, gencor = 0,
                                           estimators = estimators,
                                           tmle_args = list(
                                             "g_lib" = c("SL.glm"), "miss_lib" = c("SL.glm"),

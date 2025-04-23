@@ -314,7 +314,6 @@ run_one_estimator <- function(estimator, df, oracle_formula,
   }
   # IPCW-TMLE: ver 2
   else if (estimator == "ipcw-tmle-ver-2") {
-    print(sum(df$is.complete))
     tmp <- twoStageTMLE_target_Pi_ver_2(Y = df$Y,
                                   A = df$X,
                                   W = df[, setdiff(tmle_args$phase1_covars, c("X", "Y")), drop = FALSE],
@@ -331,6 +330,28 @@ run_one_estimator <- function(estimator, df, oracle_formula,
 
     output <- list()
     output$results <- data.frame(est = c("ipcw-tmle", "ipcw-tmle-target-Pi-ver-2"),
+                                 psi = c(tmp$tmle$estimates$ATE$psi, tmp$tmle_target_Pi$estimates$ATE$psi),
+                                 lower = c(tmp$tmle$estimates$ATE$CI[1], tmp$lower),
+                                 upper = c(tmp$tmle$estimates$ATE$CI[2], tmp$upper))
+  }
+  # IPCW-TMLE: ver 3
+  else if (estimator == "ipcw-tmle-ver-3") {
+    tmp <- twoStageTMLE_target_Pi_ver_3(Y = df$Y,
+                                        A = df$X,
+                                        W = df[, setdiff(tmle_args$phase1_covars, c("X", "Y")), drop = FALSE],
+                                        W.stage2 = df[complete.cases(df), tmle_args$phase2_covars, drop = FALSE],
+                                        Delta.W = df$is.complete,
+                                        condSetNames = c("W", "A", "Y"),
+                                        pi.SL.library = "SL.glm", V.pi = 10,
+                                        Q.family = "binomial",
+                                        Q.SL.library = "SL.glm", V.Q = 10,
+                                        g.SL.library = "SL.glm", V.g = 10,
+                                        augmentW = FALSE,
+                                        verbose = FALSE,
+                                        browse = FALSE)
+
+    output <- list()
+    output$results <- data.frame(est = c("ipcw-tmle", "ipcw-tmle-target-Pi-ver-3"),
                                  psi = c(tmp$tmle$estimates$ATE$psi, tmp$tmle_target_Pi$estimates$ATE$psi),
                                  lower = c(tmp$tmle$estimates$ATE$CI[1], tmp$lower),
                                  upper = c(tmp$tmle$estimates$ATE$CI[2], tmp$upper))

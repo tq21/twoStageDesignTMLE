@@ -87,16 +87,16 @@
 #' Two-Stage Designs. \emph{Int J Biostat.} 2011 Jan 1; 7(1): 17.
 #' \doi{doi:10.2202/1557-4679.1217}
 #' @export
-twoStageTMLE_target_Pi_ver_2 <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
-                                         Delta = rep(1, length(Y)), pi=NULL, piform=NULL, pi_oracle=NULL,
-                                         DFullReg_true = NULL,
-                                         pi.SL.library = c("SL.glm", "SL.gam", "SL.glmnet", "tmle.SL.dbarts.k.5"),
-                                         DFullReg.library = c("tmle.SL.dbarts2"),
-                                         V.pi=10, pi.discreteSL = TRUE, condSetNames = c("A","W","Y"), id = NULL,
-                                         Q.family = "gaussian", augmentW = TRUE,
-                                         augW.SL.library = c("SL.glm", "SL.glmnet", "tmle.SL.dbarts2"),
-                                         rareOutcome=FALSE,
-                                         verbose=FALSE, browse=FALSE, ...) {
+twoStageTMLE_plugin_ver_0 <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
+                                      Delta = rep(1, length(Y)), pi=NULL, piform=NULL, pi_oracle=NULL,
+                                      DFullReg_true = NULL,
+                                      pi.SL.library = c("SL.glm", "SL.gam", "SL.glmnet", "tmle.SL.dbarts.k.5"),
+                                      DFullReg.library = c("tmle.SL.dbarts2"),
+                                      V.pi=10, pi.discreteSL = TRUE, condSetNames = c("A","W","Y"), id = NULL,
+                                      Q.family = "gaussian", augmentW = TRUE,
+                                      augW.SL.library = c("SL.glm", "SL.glmnet", "tmle.SL.dbarts2"),
+                                      rareOutcome=FALSE,
+                                      verbose=FALSE, browse=FALSE, ...) {
 
   if (browse) browser()
 
@@ -166,36 +166,28 @@ twoStageTMLE_target_Pi_ver_2 <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   result$tmle <- try(do.call(tmle::tmle, argList))
 
   # target Pi ------------------------------------------------------------------
-  # compute DFull regression
+  # MI to impute DFullReg
   DFull <- as.numeric(result$tmle$estimates$IC$IC.ATE)
-  Nimp <- 20
+  DFull_obs <- rep(NA, length(Delta.W))
+  DFull_obs[Delta.W == 1] <- DFull
   W.stage2_fill <- as.data.frame(matrix(NA, nrow = length(Y), ncol = ncol(W.stage2)))
   W.stage2_fill[Delta.W == 1, ] <- W.stage2
   names(W.stage2_fill) <- names(W.stage2)
-  df_mi <- data.frame(Y = Y,
+  df_mi <- data.frame(DFull = DFull_obs, # target of imputation
+                      Y = Y,
                       A = A,
                       Delta.W = Delta.W,
                       W,
                       W.stage2_fill)
   init <- mice::mice(df_mi, maxit = 0)
   predM <- init$predictorMatrix
-  imp <- mice::mice(df_mi, predictorMatrix = predM, m = Nimp, maxit = 20, print = FALSE)
-  DFull_all <- matrix(0, nrow = length(Y), ncol = Nimp)
-
-  for (m in 1:Nimp) {
-    comp <- mice::complete(imp, m)
-    tmle_m <- tmle::tmle(Y = comp$Y,
-                         A = comp$A,
-                         W = cbind(comp[, colnames(W), drop = FALSE],
-                                   comp[, colnames(W.stage2), drop = FALSE]),
-                         family = Q.family,
-                         g.SL.library = c("SL.glm"),
-                         Q.SL.library = c("SL.glm"),
-                         verbose = FALSE)
-    DFull_all[, m] <- tmle_m$estimates$IC$IC.ATE
-  }
-
-  DFullReg <- rowMeans(DFull_all)
+  predM[,] <- 0  # turn off all imputations
+  predM["DFull", ] <- 1  # use all variables to impute DFull
+  predM["DFull", "DFull"] <- 0  # but not itself
+  Nimp <- 20
+  imp <- mice::mice(df_mi, predictorMatrix = predM, method = "pmm", m = Nimp, maxit = 20, print = FALSE)
+  DFullReg_all <- sapply(1:Nimp, function(m) mice::complete(imp, m)$DFull)
+  DFullReg <- rowMeans(DFullReg_all)
   DFullReg_R2 <- 1 - sum((DFull-DFullReg[Delta.W == 1])^2)/sum((DFull-mean(DFull))^2)
   result$DFullReg_R2 <- DFullReg_R2
 
