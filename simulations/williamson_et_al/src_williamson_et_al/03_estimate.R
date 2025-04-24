@@ -356,6 +356,28 @@ run_one_estimator <- function(estimator, df, oracle_formula,
                                  lower = c(tmp$tmle$estimates$ATE$CI[1], tmp$lower),
                                  upper = c(tmp$tmle$estimates$ATE$CI[2], tmp$upper))
   }
+  # IPCW-TMLE plugin: ver 0
+  else if (estimator == "ipcw-tmle-plugin-ver-0") {
+    tmp <- twoStageTMLE_plugin_ver_0(Y = df$Y,
+                                     A = df$X,
+                                     W = df[, setdiff(tmle_args$phase1_covars, c("X", "Y")), drop = FALSE],
+                                     W.stage2 = df[complete.cases(df), tmle_args$phase2_covars, drop = FALSE],
+                                     Delta.W = df$is.complete,
+                                     condSetNames = c("W", "A", "Y"),
+                                     pi.SL.library = "SL.glm", V.pi = 10,
+                                     Q.family = "binomial",
+                                     Q.SL.library = "SL.glm", V.Q = 10,
+                                     g.SL.library = "SL.glm", V.g = 10,
+                                     augmentW = FALSE,
+                                     verbose = FALSE,
+                                     browse = FALSE)
+
+    output <- list()
+    output$results <- data.frame(est = c("ipcw-tmle", "ipcw-tmle-plugin-ver-0"),
+                                 psi = c(tmp$tmle$estimates$ATE$psi, tmp$psi),
+                                 lower = c(tmp$tmle$estimates$ATE$CI[1], tmp$lower),
+                                 upper = c(tmp$tmle$estimates$ATE$CI[2], tmp$upper))
+  }
   # TMLE-M
   else if (grepl("TMLE", estimator, ignore.case = TRUE)) {
     # check if TMLE-M or TMLE-MTO

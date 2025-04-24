@@ -165,88 +165,42 @@ twoStageTMLE_plugin_ver_0 <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   result <- list()
   result$tmle <- try(do.call(tmle::tmle, argList))
 
-  # target Pi ------------------------------------------------------------------
-  # MI to impute DFullReg
-  DFull <- as.numeric(result$tmle$estimates$IC$IC.ATE)
-  DFull_obs <- rep(NA, length(Delta.W))
-  DFull_obs[Delta.W == 1] <- DFull
-  W.stage2_fill <- as.data.frame(matrix(NA, nrow = length(Y), ncol = ncol(W.stage2)))
-  W.stage2_fill[Delta.W == 1, ] <- W.stage2
-  names(W.stage2_fill) <- names(W.stage2)
-  df_mi <- data.frame(DFull = DFull_obs, # target of imputation
-                      Y = Y,
-                      A = A,
-                      Delta.W = Delta.W,
-                      W,
-                      W.stage2_fill)
-  init <- mice::mice(df_mi, maxit = 0)
-  predM <- init$predictorMatrix
-  predM[,] <- 0  # turn off all imputations
-  predM["DFull", ] <- 1  # use all variables to impute DFull
-  predM["DFull", "DFull"] <- 0  # but not itself
-  Nimp <- 20
-  imp <- mice::mice(df_mi, predictorMatrix = predM, method = "pmm", m = Nimp, maxit = 20, print = FALSE)
-  DFullReg_all <- sapply(1:Nimp, function(m) mice::complete(imp, m)$DFull)
-  DFullReg <- rowMeans(DFullReg_all)
-  DFullReg_R2 <- 1 - sum((DFull-DFullReg[Delta.W == 1])^2)/sum((DFull-mean(DFull))^2)
-  result$DFullReg_R2 <- DFullReg_R2
+  # estimate non-centered EIC --------------------------------------------------
+  Q1W <- result$tmle$Qinit$Q[, "Q1W"]
+  Q0W <- result$tmle$Qinit$Q[, "Q0W"]
+  QAW <- Q1W*A[Delta.W == 1]+Q0W*(1-A[Delta.W == 1])
+  g1W <- result$tmle$g$g1W
+  DFullNC <- (A[Delta.W == 1]/g1W-(1-A[Delta.W == 1])/(1-g1W))*(Y[Delta.W == 1]-QAW)+Q1W-Q0W
+  DFullNCReg <- estimateDfullReg(DFull = DFullNC,
+                                 Delta = Delta.W,
+                                 V = res.twoStage$d.pi,
+                                 DFullbounds = c(-Inf, Inf),
+                                 DFullform = NULL,
+                                 SL.library = DFullReg.library,
+                                 verbose = verbose,
+                                 discreteSL = TRUE,
+                                 Vfold = argList$V.Q)
+  DFullNCReg <- DFullNCReg$DFullReg
+  DFullNCReg_R2 <- 1 - sum((DFullNC-DFullNCReg[Delta.W == 1])^2)/sum((DFullNC-mean(DFullNC))^2)
+  result$DFullNCReg_R2 <- DFullNCReg_R2
 
-  # TMLE of Pi w/ clever cov DFullReg/Pi and intercept
-  cur_iter <- 1
-  sn <- 0
-  dx <- 0.0000001
-  max_iter <- 10000
-  clever_cov <- DFullReg/as.numeric(res.twoStage$pi)
-  PnEIC_prev <- mean(clever_cov*(Delta.W-res.twoStage$pi))
-  prev_pos <- PnEIC_prev >= 0
-  #print(mean(DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
-  while (cur_iter <= max_iter & abs(PnEIC_prev) > sn) {
-    clever_cov <- DFullReg/as.numeric(res.twoStage$pi)
+  # target DFullNCReg ----------------------------------------------------------
+  #print(mean(1/res.twoStage$pi[Delta.W == 1]*(DFullNC - DFullNCReg[Delta.W == 1]))) # CHECK PT
+  H <- as.numeric(Delta.W/res.twoStage$pi)
+  epsilon <- coef(glm(DFullNC ~ -1 + offset(DFullNCReg[Delta.W == 1]) + H[Delta.W == 1], family = "gaussian"))
+  epsilon[is.na(epsilon)] <- 0
+  DFullNCReg[Delta.W == 1] <- DFullNCReg[Delta.W == 1] + epsilon * H[Delta.W == 1]
+  #print(mean(1/res.twoStage$pi[Delta.W == 1]*(DFullNC - DFullNCReg[Delta.W == 1]))) # CHECK PT
 
-    # if signs flip, reduce step size
-    cur_pos <- PnEIC_prev >= 0
-    if (cur_pos != prev_pos) {
-      dx <- dx/10
-    }
-    prev_pos <- cur_pos
-
-    # if PnEIC diff to small, increase step size
-    PnEIC_cur <- mean(clever_cov*(Delta.W-res.twoStage$pi))
-    if (abs(PnEIC_cur - PnEIC_prev) < 1e-6) {
-      dx <- dx*10
-    }
-    PnEIC_prev <- PnEIC_cur
-
-    res.twoStage$pi <- plogis(.bound(qlogis(res.twoStage$pi) + dx*sign(PnEIC_cur)*clever_cov, c(-10, 10)))
-    cur_iter <- cur_iter + 1
-    eic <- eic(Delta = Delta.W,
-               Pi = res.twoStage$pi,
-               D_full = DFull,
-               D_full_mean = DFullReg)
-    sn <- 0.001*sqrt(var(eic, na.rm = TRUE))/(sqrt(length(Delta.W)) * log(length(Delta.W)))
-    #print(PnEIC_prev)
-  }
-  #print(mean(DFullReg/as.numeric(res.twoStage$pi)*(Delta.W-res.twoStage$pi)))
-
-  # re-target Q* using the targeted Pi
-  obsWeights <- Delta.W/res.twoStage$pi
-  obsWeights <- obsWeights / sum(obsWeights) * sum(Delta.W)
-  ub <- sqrt(sum(Delta.W)) * log(sum(Delta.W)) / 5
-  obsWeights <- .bound(Delta.W/res.twoStage$pi, c(0, ub))
-  argList$obsWeights <- obsWeights[Delta.W == 1]
-  argList$g1W <- result$tmle$g$g1W
-  #print(mean(obsWeights[Delta.W == 1]*(result$tmle$Qstar[, "Q1W"]-result$tmle$Qstar[, "Q0W"])))
-
-  # use Q initial
-  argList$Q <- result$tmle$Qinit$Q
-  result$tmle_target_Pi <- try(do.call(tmle::tmle, argList))
-  result$eic <- eic(Delta = Delta.W,
-                    Pi = res.twoStage$pi,
-                    D_full = as.numeric(result$tmle_target_Pi$estimates$IC$IC.ATE),
-                    D_full_mean = DFullReg)
+  # point estimate and inference -----------------------------------------------
+  psi <- mean(DFullNCReg)
+  DFullNC_aug <- numeric(length(DFullNCReg))
+  DFullNC_aug[Delta.W == 1] <- DFullNC
+  result$eic <- as.numeric(Delta.W/res.twoStage$pi)*(DFullNC_aug-DFullNCReg)+DFullNCReg-psi
   se <- sqrt(var(result$eic, na.rm = TRUE) / length(Delta.W))
-  result$lower <- result$tmle_target_Pi$estimates$ATE$psi + qnorm(0.025) * se
-  result$upper <- result$tmle_target_Pi$estimates$ATE$psi + qnorm(0.975) * se
+  result$psi <- psi
+  result$lower <- psi + qnorm(0.025) * se
+  result$upper <- psi + qnorm(0.975) * se
 
   result$twoStage <- res.twoStage
   result$augW <- W.Q

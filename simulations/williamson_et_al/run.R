@@ -35,6 +35,8 @@ run <- function(est_name) {
         estimators <- c("ipcw-tmle-ver-2", estimators)
       } else if (est_name == "ver_3") {
         estimators <- c("ipcw-tmle-ver-3", estimators)
+      } else if (est_name == "plugin_ver_0") {
+        estimators <- c("ipcw-tmle-plugin-ver-0", estimators)
       }
 
       res <- investigate_performance_once(mc_id = 1,
