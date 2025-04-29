@@ -378,6 +378,30 @@ run_one_estimator <- function(estimator, df, oracle_formula,
                                  lower = c(tmp$tmle$estimates$ATE$CI[1], tmp$lower),
                                  upper = c(tmp$tmle$estimates$ATE$CI[2], tmp$upper))
   }
+  # IPCW-TMLE plugin: compare three methods to estimate E(DFullNC|Delta=1,V)
+  else if (estimator == "ipcw-tmle-plugin-DFullReg-compare") {
+    tmp <- twoStageTMLE_plugin_DFullReg_compare(Y = df$Y,
+                                                A = df$X,
+                                                W = df[, setdiff(tmle_args$phase1_covars, c("X", "Y")), drop = FALSE],
+                                                W.stage2 = df[complete.cases(df), tmle_args$phase2_covars, drop = FALSE],
+                                                Delta.W = df$is.complete,
+                                                condSetNames = c("W", "A", "Y"),
+                                                pi.SL.library = "SL.glm", V.pi = 10,
+                                                Q.family = "binomial",
+                                                Q.SL.library = "SL.glm", V.Q = 10,
+                                                g.SL.library = "SL.glm", V.g = 10,
+                                                augmentW = FALSE,
+                                                verbose = FALSE,
+                                                browse = FALSE)
+    output <- list()
+    output$results <- data.frame(est = c("ipcw-tmle",
+                                         "ipcw-tmle-plugin-DFullReg-SL",
+                                         "ipcw-tmle-plugin-DFullReg-MI",
+                                         "ipcw-tmle-plugin-DFullReg-MI-direct"),
+                                 psi = c(tmp$tmle$estimates$ATE$psi, tmp$psi, tmp$psi_MI, tmp$psi_MI_direct),
+                                 lower = c(tmp$tmle$estimates$ATE$CI[1], tmp$lower, tmp$lower_MI, tmp$lower_MI_direct),
+                                 upper = c(tmp$tmle$estimates$ATE$CI[2], tmp$upper, tmp$upper_MI, tmp$upper_MI_direct))
+  }
   # TMLE-M
   else if (grepl("TMLE", estimator, ignore.case = TRUE)) {
     # check if TMLE-M or TMLE-MTO

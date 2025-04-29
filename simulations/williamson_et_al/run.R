@@ -37,6 +37,8 @@ run <- function(est_name) {
         estimators <- c("ipcw-tmle-ver-3", estimators)
       } else if (est_name == "plugin_ver_0") {
         estimators <- c("ipcw-tmle-plugin-ver-0", estimators)
+      } else if (est_name == "ipcw-tmle-plugin-DFullReg-compare") {
+        estimators <- c("ipcw-tmle-plugin-DFullReg-compare", estimators)
       }
 
       res <- investigate_performance_once(mc_id = 1,
@@ -61,7 +63,7 @@ run <- function(est_name) {
                                           data_dir = "./", filename_prefix = "data_m1_y1_x1_n10000_id",
                                           filename_suffix = ".rds", read_func = readRDS,
                                           rare_outcome = FALSE)
-      res$results <- cbind(res$results, data.frame(n = rep(.n, 3)))
+      res$results <- cbind(res$results, data.frame(n = rep(.n, nrow(res$results))))
 
       return(res$results)
     })
