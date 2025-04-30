@@ -127,7 +127,11 @@ twoStageTMLE_plugin_DFullReg_compare <- function(Y, A, W, Delta.W, W.stage2, Z=N
                          g.SL.library = c("SL.glm"),
                          Q.SL.library = c("SL.glm"),
                          verbose = FALSE)
-    DFullNC_all[, m] <- tmle_m$estimates$IC$IC.ATE
+    Q1W_m <- tmle_m$Qinit$Q[, "Q1W"]
+    Q0W_m <- tmle_m$Qinit$Q[, "Q0W"]
+    QAW_m <- Q1W_m*A+Q0W_m*(1-A)
+    g1W_m <- tmle_m$g$g1W
+    DFullNC_all[, m] <- (A/g1W_m-(1-A)/(1-g1W_m))*(Y-QAW_m)+Q1W_m-Q0W_m
   }
   DFullNCReg_MI <- rowMeans(DFullNC_all)
   DFullNCReg_MI <- estimateDFullReg_pool(DFull = DFullNCReg_MI,
