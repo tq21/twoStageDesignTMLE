@@ -130,6 +130,16 @@ twoStageTMLE_plugin_DFullReg_compare <- function(Y, A, W, Delta.W, W.stage2, Z=N
     DFullNC_all[, m] <- tmle_m$estimates$IC$IC.ATE
   }
   DFullNCReg_MI <- rowMeans(DFullNC_all)
+  DFullNCReg_MI <- estimateDFullReg_pool(DFull = DFullNCReg_MI,
+                                         Delta = Delta.W,
+                                         V = res.twoStage$d.pi,
+                                         DFullbounds = c(-Inf, Inf),
+                                         DFullform = NULL,
+                                         SL.library = DFullReg.library,
+                                         verbose = verbose,
+                                         discreteSL = TRUE,
+                                         Vfold = argList$V.Q)
+  DFullNCReg_MI <- DFullNCReg_MI$DFullReg
   DFullNCReg_MI_R2 <- 1 - sum((DFullNC-DFullNCReg_MI[Delta.W == 1])^2)/sum((DFullNC-mean(DFullNC))^2)
   result$DFullNCReg_MI_R2 <- DFullNCReg_MI_R2
 
@@ -152,8 +162,18 @@ twoStageTMLE_plugin_DFullReg_compare <- function(Y, A, W, Delta.W, W.stage2, Z=N
   predM["DFullNC", "DFullNC"] <- 0  # but not itself
   Nimp <- 50
   imp <- mice::mice(df_mi, predictorMatrix = predM, method = "pmm", m = Nimp, maxit = 20, print = FALSE)
-  DFullNCReg_all <- sapply(1:Nimp, function(m) mice::complete(imp, m)$DFullNC)
-  DFullNCReg_MI_direct <- rowMeans(DFullNCReg_all)
+  DFullNC_all <- sapply(1:Nimp, function(m) mice::complete(imp, m)$DFullNC)
+  DFullNC_MI_direct <- rowMeans(DFullNC_all)
+  DFullNCReg_MI_direct <- estimateDFullReg_pool(DFull = DFullNC_MI_direct,
+                                                Delta = Delta.W,
+                                                V = res.twoStage$d.pi,
+                                                DFullbounds = c(-Inf, Inf),
+                                                DFullform = NULL,
+                                                SL.library = DFullReg.library,
+                                                verbose = verbose,
+                                                discreteSL = TRUE,
+                                                Vfold = argList$V.Q)
+  DFullNCReg_MI_direct <- DFullNCReg_MI_direct$DFullReg
   DFullNCReg_MI_direct_R2 <- 1 - sum((DFullNC-DFullNCReg_MI_direct[Delta.W == 1])^2)/sum((DFullNC-mean(DFullNC))^2)
   result$DFullNCReg_MI_direct_R2 <- DFullNCReg_MI_direct_R2
 

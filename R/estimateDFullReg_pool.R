@@ -2,7 +2,7 @@
 #'
 #' Method 2:
 #' Regress DFullNC on Delta and V, on all observations, evaluate at Delta=1
-estimateDFullReg_MI <- function(DFull,
+estimateDFullReg_pool <- function(DFull,
                                   Delta,
                                   V,
                                   DFullbounds,
@@ -11,7 +11,6 @@ estimateDFullReg_MI <- function(DFull,
                                   verbose,
                                   discreteSL,
                                   Vfold) {
-  browser()
   .expandLib <- function(SL.lib){
     if (is.list(SL.lib)){
       counts <- sapply(SL.lib, length)
