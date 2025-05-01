@@ -29,5 +29,5 @@ module load r
 # R CMD BATCH --no-save run_ver_2.R logs/run_ver_2.Rout &
 # R CMD BATCH --no-save run_ver_3.R logs/run_ver_3.Rout &
 # R CMD BATCH --no-save run_plugin_ver_0.R logs/run_plugin_ver_0.Rout &
-R CMD BATCH --no-save run_plugin_DFullReg_compare.R logs/run_plugin_DFullReg_compare_2.Rout &
+R CMD BATCH --no-save run_plugin_DFullReg_compare.R logs/run_plugin_DFullReg_compare_3.Rout &
 wait

@@ -18,6 +18,7 @@ truth <- get_true_ATE(N = 1e7,
 res_df <- read.csv("out/ipcw-tmle-plugin-DFullReg-compare_0430_132755.csv")
 
 res_df %>%
+  filter(est != "ipcw-tmle-plugin-DFullReg-MI-direct") %>%
   summarize(abs_bias = abs(mean(psi - truth)),
             se = sd(psi),
             mse = mean((psi - truth)^2),

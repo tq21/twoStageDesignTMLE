@@ -18,8 +18,8 @@ source("src_williamson_et_al/02_methods_tmle.R")
 source("src_williamson_et_al/03_estimate.R")
 set.seed(123)
 
-B <- 500
-n_seq <- seq(500, 2000, 500)
+B <- 200
+n_seq <- 500#seq(500, 2000, 500)
 
 run <- function(est_name) {
   res_df <- map_dfr(n_seq, function(.n) {
