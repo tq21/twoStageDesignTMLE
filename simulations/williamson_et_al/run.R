@@ -18,7 +18,7 @@ source("src_williamson_et_al/02_methods_tmle.R")
 source("src_williamson_et_al/03_estimate.R")
 set.seed(123)
 
-B <- 200
+B <- 100
 n_seq <- 500#seq(500, 2000, 500)
 
 run <- function(est_name) {
