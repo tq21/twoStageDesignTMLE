@@ -1,0 +1,204 @@
+
+R version 4.4.0 (2024-04-24) -- "Puppy Cup"
+Copyright (C) 2024 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> source("run.R")
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Loading required package: usethis
+Loading required package: grid
+Loading required package: Matrix
+Loading required package: survival
+
+Attaching package: ‘survey’
+
+The following object is masked from ‘package:graphics’:
+
+    dotchart
+
+
+Attaching package: ‘mice’
+
+The following object is masked from ‘package:stats’:
+
+    filter
+
+The following objects are masked from ‘package:base’:
+
+    cbind, rbind
+
+
+Attaching package: ‘data.table’
+
+The following object is masked from ‘package:purrr’:
+
+    transpose
+
+The following objects are masked from ‘package:dplyr’:
+
+    between, first, last
+
+ℹ Loading twoStageDesignTMLE
+Loading required package: tmle
+Loading required package: glmnet
+Loaded glmnet 4.1-8
+Loading required package: SuperLearner
+Loading required package: nnls
+Loading required package: gam
+Loading required package: splines
+Loading required package: foreach
+
+Attaching package: ‘foreach’
+
+The following objects are masked from ‘package:purrr’:
+
+    accumulate, when
+
+Loaded gam 1.22-5
+
+Super Learner
+Version: 2.0-29
+Package created on 2024-02-06
+
+Welcome to the tmle package, version 2.0.0
+
+Use tmleNews() to see details on changes and bug fixes
+Welcome to the twoStageDesignTMLE package
+
+Use twoStageDesignTMLENews() to see details on changes and bug fixes
+> 
+> est_name <- "ipcw-tmle-plugin-DFullReg-compare"
+> res_df <- run(est_name = est_name)
+[1] "n: 500, b: 1..."
+Loading required namespace: dbarts
+[1] "n: 500, b: 2..."
+[1] "n: 500, b: 3..."
+[1] "n: 500, b: 4..."
+[1] "n: 500, b: 5..."
+[1] "n: 500, b: 6..."
+[1] "n: 500, b: 7..."
+[1] "n: 500, b: 8..."
+[1] "n: 500, b: 9..."
+[1] "n: 500, b: 10..."
+[1] "n: 500, b: 11..."
+[1] "n: 500, b: 12..."
+[1] "n: 500, b: 13..."
+[1] "n: 500, b: 14..."
+[1] "n: 500, b: 15..."
+[1] "n: 500, b: 16..."
+[1] "n: 500, b: 17..."
+[1] "n: 500, b: 18..."
+[1] "n: 500, b: 19..."
+[1] "n: 500, b: 20..."
+[1] "n: 500, b: 21..."
+[1] "n: 500, b: 22..."
+[1] "n: 500, b: 23..."
+[1] "n: 500, b: 24..."
+[1] "n: 500, b: 25..."
+[1] "n: 500, b: 26..."
+[1] "n: 500, b: 27..."
+[1] "n: 500, b: 28..."
+[1] "n: 500, b: 29..."
+[1] "n: 500, b: 30..."
+[1] "n: 500, b: 31..."
+[1] "n: 500, b: 32..."
+[1] "n: 500, b: 33..."
+[1] "n: 500, b: 34..."
+[1] "n: 500, b: 35..."
+[1] "n: 500, b: 36..."
+[1] "n: 500, b: 37..."
+[1] "n: 500, b: 38..."
+[1] "n: 500, b: 39..."
+[1] "n: 500, b: 40..."
+[1] "n: 500, b: 41..."
+[1] "n: 500, b: 42..."
+[1] "n: 500, b: 43..."
+[1] "n: 500, b: 44..."
+[1] "n: 500, b: 45..."
+[1] "n: 500, b: 46..."
+[1] "n: 500, b: 47..."
+[1] "n: 500, b: 48..."
+[1] "n: 500, b: 49..."
+[1] "n: 500, b: 50..."
+[1] "n: 500, b: 51..."
+[1] "n: 500, b: 52..."
+[1] "n: 500, b: 53..."
+[1] "n: 500, b: 54..."
+[1] "n: 500, b: 55..."
+[1] "n: 500, b: 56..."
+[1] "n: 500, b: 57..."
+[1] "n: 500, b: 58..."
+[1] "n: 500, b: 59..."
+[1] "n: 500, b: 60..."
+[1] "n: 500, b: 61..."
+[1] "n: 500, b: 62..."
+[1] "n: 500, b: 63..."
+[1] "n: 500, b: 64..."
+[1] "n: 500, b: 65..."
+[1] "n: 500, b: 66..."
+[1] "n: 500, b: 67..."
+[1] "n: 500, b: 68..."
+[1] "n: 500, b: 69..."
+[1] "n: 500, b: 70..."
+[1] "n: 500, b: 71..."
+[1] "n: 500, b: 72..."
+[1] "n: 500, b: 73..."
+[1] "n: 500, b: 74..."
+[1] "n: 500, b: 75..."
+[1] "n: 500, b: 76..."
+[1] "n: 500, b: 77..."
+[1] "n: 500, b: 78..."
+[1] "n: 500, b: 79..."
+[1] "n: 500, b: 80..."
+[1] "n: 500, b: 81..."
+[1] "n: 500, b: 82..."
+[1] "n: 500, b: 83..."
+[1] "n: 500, b: 84..."
+[1] "n: 500, b: 85..."
+[1] "n: 500, b: 86..."
+[1] "n: 500, b: 87..."
+[1] "n: 500, b: 88..."
+[1] "n: 500, b: 89..."
+[1] "n: 500, b: 90..."
+[1] "n: 500, b: 91..."
+[1] "n: 500, b: 92..."
+[1] "n: 500, b: 93..."
+[1] "n: 500, b: 94..."
+[1] "n: 500, b: 95..."
+[1] "n: 500, b: 96..."
+[1] "n: 500, b: 97..."
+[1] "n: 500, b: 98..."
+[1] "n: 500, b: 99..."
+[1] "n: 500, b: 100..."
+There were 50 or more warnings (use warnings() to see the first 50)
+> write.csv(res_df,
++           file = "out/" %+% est_name %+% "_" %+% timestamp %+% ".csv",
++           row.names = FALSE)
+> 
+> proc.time()
+    user   system  elapsed 
+7205.890   11.022 7289.817 
