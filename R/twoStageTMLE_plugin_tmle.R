@@ -1,10 +1,14 @@
-#' A-IPCW-TMLE, plug-in, imputation-based estimator
+#' Plug-in imputation-based TMLE
 #'
-#' Compare three methods to estimate E(DFullNC|Delta=1,V)
+#' - Estimate Qn, gn via inverse weighting, get DFullNC estimate for Delta=1
+#' - Estimate E(DFullNC|Delta=1,V) using HAL
+#' - epsilon, one-dimensional path through Qn, evaluate P_n Delta/Pi_n DFullNC
 #' 1. Regress DFullNC on V, only on Delta=1 observations
 #' 2. Generate MI full data, run full data TMLE on each, obtain empirical EIC,
 #'    then average to get E(DFullNC|Delta=1,V)
 #' 3. Use MI to directly estimate E(DFullNC|Delta=1,V)
+library(hal9001)
+library(glmnet)
 twoStageTMLE_plugin_DFullReg_compare <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
                                                  Delta = rep(1, length(Y)), pi=NULL, piform=NULL, pi_oracle=NULL,
                                                  DFullReg_true = NULL,
@@ -82,13 +86,41 @@ twoStageTMLE_plugin_DFullReg_compare <- function(Y, A, W, Delta.W, W.stage2, Z=N
   result <- list()
   result$tmle <- try(do.call(tmle::tmle, argList))
 
-  # estimate non-centered EIC --------------------------------------------------
-  # method 1: Regress DFullNC on V, only on Delta=1 observations
+  # estimate E(DFull|Delta=1,V) ----------------------------------------------
   Q1W <- result$tmle$Qinit$Q[, "Q1W"]
   Q0W <- result$tmle$Qinit$Q[, "Q0W"]
   QAW <- Q1W*A[Delta.W == 1]+Q0W*(1-A[Delta.W == 1])
   g1W <- result$tmle$g$g1W
-  DFullNC <- (A[Delta.W == 1]/g1W-(1-A[Delta.W == 1])/(1-g1W))*(Y[Delta.W == 1]-QAW)+Q1W-Q0W
+  psi <- sum((1/sum(Delta.W))*(1/res.twoStage$pi*(Q1W-Q0W)))
+  DFull <- (A[Delta.W == 1]/g1W-(1-A[Delta.W == 1])/(1-g1W))*(Y[Delta.W == 1]-QAW)+Q1W-Q0W-psi
+  DFullNCReg <- estimateDfullReg(DFull = DFull,
+                                 Delta = Delta.W,
+                                 V = res.twoStage$d.pi,
+                                 DFullbounds = c(-Inf, Inf),
+                                 DFullform = NULL,
+                                 SL.library = DFullReg.library,
+                                 verbose = verbose,
+                                 discreteSL = TRUE,
+                                 Vfold = argList$V.Q)
+  DFullReg <- DFullReg$DFullReg
+
+  # TMLE -----------------------------------------------------------------------
+  # compute gamma: PnE(DFullReg|Delta=1,V)
+  gamma <- mean(DFullReg)
+
+  # solve for epsilon
+  H1W <- A[Delta.W == 1]/g1W; H0W <- -(1-A[Delta.W == 1])/(1-g1W)
+  H1W_aug <- numeric(length(Delta.W)); H1W_aug[Delta.W == 1] <- H1W
+  H0W_aug <- numeric(length(Delta.W)); H0W_aug[Delta.W == 1] <- H0W
+  HAW <- H1W*A[Delta.W == 1]+H0W*(1-A[Delta.W == 1])
+  H_diff <- sum((1/sum(Delta.W))*(1/res.twoStage$pi[Delta.W == 1]*(H1W-H0W)))
+  M <- H1W[1]-H0W[1]-HAW[1]^2-H_diff
+  epsilon <- gamma/M
+
+
+  # estimate non-centered EIC --------------------------------------------------
+  # method 1: Regress DFullNC on V, only on Delta=1 observations
+
   DFullNCReg <- estimateDfullReg(DFull = DFullNC,
                                  Delta = Delta.W,
                                  V = res.twoStage$d.pi,
