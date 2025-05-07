@@ -1,6 +1,6 @@
 #!/bin/bash
 # Job name:
-#SBATCH --job-name=twoStage_estimate_Pi
+#SBATCH --job-name=impute
 #
 # Partition:
 #SBATCH --partition=savio3
@@ -13,7 +13,7 @@
 #
 # Number of nodes for use case:
 #SBATCH --nodes=1
-#SBATCH --ntasks=6
+#SBATCH --ntasks=3
 #SBATCH --cpus-per-task=1
 #
 # Mail type:
@@ -27,8 +27,5 @@ module load r
 R CMD BATCH --no-save run_Y_simple_binomial_Delta_large.R logs/run_Y_simple_binomial_Delta_large.Rout &
 R CMD BATCH --no-save run_Y_simple_binomial_Delta_med_strong.R logs/run_Y_simple_binomial_Delta_med_strong.Rout &
 R CMD BATCH --no-save run_Y_simple_binomial_Delta_med.R logs/run_Y_simple_binomial_Delta_med.Rout &
-R CMD BATCH --no-save run_Y_simple_gaussian_Delta_large.R logs/run_Y_simple_gaussian_Delta_large.Rout &
-R CMD BATCH --no-save run_Y_simple_gaussian_Delta_med_strong.R logs/run_Y_simple_gaussian_Delta_med_strong.Rout &
-R CMD BATCH --no-save run_Y_simple_gaussian_Delta_med.R logs/run_Y_simple_gaussian_Delta_med.Rout &
 
 wait
