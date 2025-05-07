@@ -10,7 +10,7 @@ run <- function(Y_type,
                 Delta_type,
                 true_Pi,
                 Q.family) {
-  B <- 50#100
+  B <- 10#100
   n_seq <- 500#seq(1000, 4000, 1000)
 
   res_df <- map_dfr(n_seq, function(.n) {
@@ -36,30 +36,18 @@ run <- function(Y_type,
       if (true_Pi) {
         call_args$pi_oracle <- Pi
       }
-      res <- do.call("twoStageTMLE_plugin_DFullReg_compare", call_args)
+      res <- do.call("twoStageTMLE_plugin_tmle", call_args)
 
       return(data.frame(n = .n,
                         b = .b,
                         est_name = c("IPCW-TMLE",
-                                     "SL-AIPCW",
-                                     "target-DFullNCReg-SL",
-                                     "target-DFullNCReg-MI",
-                                     "target-DFullNCReg-MI-direct"),
+                                     "IPCW-TMLE-efficient"),
                         psi = c(res$tmle$estimates$ATE$psi,
-                                res$psi_aipcw,
-                                res$psi,
-                                res$psi_MI,
-                                res$psi_MI_direct),
+                                res$psi),
                         lower = c(res$tmle$estimates$ATE$CI[1],
-                                  res$lower_aipcw,
-                                  res$lower,
-                                  res$lower_MI,
-                                  res$lower_MI_direct),
+                                  res$lower),
                         upper = c(res$tmle$estimates$ATE$CI[2],
-                                  res$upper_aipcw,
-                                  res$upper,
-                                  res$upper_MI,
-                                  res$upper_MI_direct)))
+                                  res$upper)))
     })
   })
 

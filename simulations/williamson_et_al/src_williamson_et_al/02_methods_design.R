@@ -24,14 +24,14 @@ run_cc <- function(data, formula = "Y ~ X", procedure = "oracle", coefficient_of
   }
   est <- coef(fit)[coefficient_of_interest] # don't hard code this, get name of variable that we want
   SE <- summary(fit)$coef[coefficient_of_interest, 2]
-  conditional_est <- data.frame("procedure" = procedure, "estimand" = "canonical_parameter", 
+  conditional_est <- data.frame("procedure" = procedure, "estimand" = "canonical_parameter",
                                 "est" = est, "SE" = SE)
-  
+
   # marginal_params <- get_marginal_estimates(fit = fit, data = data, estimator = procedure)
   marginal_params <- marginal_effects_new(fit=fit, weights=NULL, coefficient_of_interest = coefficient_of_interest)
-  
+
   marginal_est <- data.frame("procedure" = procedure, marginal_params)
-  
+
   coefs <- data.frame("procedure" = procedure, summary(fit)$coefficients)
   names(coefs) <- c("procedure", "Estimate", "SE", "test_statistic", "p_value")
   return(list("results" = rbind.data.frame(conditional_est, marginal_est),
@@ -63,8 +63,8 @@ run_ipw <- function(data, outcome_formula = "Y ~ X", miss_formula = "is.complete
   SE <- sqrt(diag(sandwich::sandwich(ipw_fit)))[coefficient_of_interest]
   # marginal_params <- get_marginal_estimates(fit = ipw_fit, data = data_cc, estimator = "ipw")
   marginal_params <- marginal_effects_new(fit=ipw_fit, weights=weights(ipw_fit), coefficient_of_interest = coefficient_of_interest)
-  
-  conditional_est <- data.frame("procedure" = "IPW", "estimand" = "canonical_parameter", 
+
+  conditional_est <- data.frame("procedure" = "IPW", "estimand" = "canonical_parameter",
                                      "est" = est, "SE" = SE)
   marginal_est <- data.frame("procedure" = "IPW", marginal_params)
   coefs <- data.frame("procedure" = "IPW", summary(ipw_fit)$coefficients)
@@ -84,7 +84,7 @@ run_iptw <- function(data, outcome_formula = "Y ~ X", miss_formula = "is.complet
   propensity_score <- predict(fit, type = "response")
   ipw_wt <- 1 / propensity_score
   ipw_wtStable <- mean(data$X)*data$X / propensity_score + mean(1 - data$X) * (1 - data$X) / propensity_score
-  
+
   #Based on input var stable, choose which version of the weights
   if(stable == TRUE){
     these_weights <- ipw_wtStable
@@ -93,7 +93,7 @@ run_iptw <- function(data, outcome_formula = "Y ~ X", miss_formula = "is.complet
     these_weights <- ipw_wt
     this_procedure <- "IPTW"
   }
-  
+
   # get IPW estimator and robust SE
   data_cc <- data
   data_cc$weights <- these_weights
@@ -102,14 +102,14 @@ run_iptw <- function(data, outcome_formula = "Y ~ X", miss_formula = "is.complet
 
   est <- summary(ipw_fit)$coef[coefficient_of_interest, 1]
   SE <- sqrt(diag(sandwich::sandwich(ipw_fit)))[coefficient_of_interest]
-  
-  conditional_est <- data.frame("procedure" = this_procedure, 
+
+  conditional_est <- data.frame("procedure" = this_procedure,
                    "estimand" = "canonical_parameter",
                    "est" = est, "SE" = SE)
   marginal_params <- get_marginal_estimates(fit = ipw_fit, data = data_cc, estimator = "iptw")
   marginal_est <- data.frame("procedure" = this_procedure, marginal_params)
 
-  return(list("results" = rbind.data.frame(conditional_est, marginal_est), 
+  return(list("results" = rbind.data.frame(conditional_est, marginal_est),
   "coefs" = summary(ipw_fit)$coefficients, "ipw_wt" = ipw_wt, "ipw_wtStable"=ipw_wtStable))
 }
 
@@ -122,21 +122,21 @@ run_iptw <- function(data, outcome_formula = "Y ~ X", miss_formula = "is.complet
 # @param fam the outcome regression family
 # @return a list, with a data.frame called "results" (contains procedure, estimand, estimate, standard error) and with an object called "fit" that can contain anything else you'd like to save
 run_RRZ_lr <- function(data = NULL, outcome_formula = "Y~X+Zs+Zw+Ws_obs", cal_formula="~X+Zs+Zw", coefficient_of_interest = "X", missing_indicator = "is.complete", fam = "binomial") {
- 	
+
 	designEstWt <- survey::estWeights(data, formula = as.formula(cal_formula), subset =~ I(data[[missing_indicator]] == 1))
   if (fam == "binomial") {
     fit <- survey::svyglm(as.formula(outcome_formula), design = designEstWt, family = quasibinomial)
   }
   est <- summary(fit)$coef[coefficient_of_interest, 1]
  	SE <- sqrt(diag(sandwich(fit)))[coefficient_of_interest]
-  
-  conditional_est <- data.frame("procedure" = "RRZ", "estimand" = "canonical_parameter", 
+
+  conditional_est <- data.frame("procedure" = "RRZ", "estimand" = "canonical_parameter",
                    "est" = est, "SE" = SE)
   marginal_params <- get_marginal_estimates(fit = fit, data = data[data[[missing_indicator]] == 1, ], estimator = "RRZ")
   marginal_est <- data.frame("procedure" = "RRZ", marginal_params)
   coefs <- data.frame("procedure" = "RRZ", summary(fit)$coefficients)
   names(coefs) <- c("procedure", "Estimate", "SE", "test_statistic", "p_value")
-  return(list("results" = rbind.data.frame(conditional_est, marginal_est), 
+  return(list("results" = rbind.data.frame(conditional_est, marginal_est),
   "coefs" = cbind.data.frame("Variable" = rownames(coefs), data.frame(coefs, row.names = NULL))))
 }
 
@@ -150,10 +150,10 @@ run_RRZ_lr <- function(data = NULL, outcome_formula = "Y~X+Zs+Zw+Ws_obs", cal_fo
 # @param missing_indicator the name of the missingness indicator
 # @param fam the outcome regression family
 # @return a list with the parameter estimate and standard error (in a data.frame) and the fitted model
-run_raking_lr <- function(data = NULL, formula = "Y ~ X", NimpRaking = 50, calOption = 1, 
+run_raking_lr <- function(data = NULL, formula = "Y ~ X", NimpRaking = 50, calOption = 1,
                           start_from_ipw = FALSE, rake_on_y = FALSE,
                           miss_formula = "is.complete ~ X + Y",
-                          coefficient_of_interest = "X", missing_indicator = "is.complete", 
+                          coefficient_of_interest = "X", missing_indicator = "is.complete",
                           fam = "binomial") {
   # get initial weights
   miss_fit <- glm(formula = as.formula(miss_formula), family = "binomial", data = data)
@@ -167,14 +167,14 @@ run_raking_lr <- function(data = NULL, formula = "Y ~ X", NimpRaking = 50, calOp
 
   #define a dataset with formula covariates and the outcome variable and impute missing data
  	data.mi <- model.frame(as.formula(formula), data = data, na.action = NULL)
- 	phase_2_indx <- (data$is.complete == 1)
+ 	phase_2_indx <- (data[[missing_indicator]]== 1)
  	# add on fake phase 2 data with missing values; this is for averaging
- 	miss_phase2 <- data.mi[data$is.complete == 1, ]
+ 	miss_phase2 <- data.mi[data[[missing_indicator]] == 1, ] # obs with full data
  	miss_cols <- which(colSums(is.na(data.mi)) > 0)
- 	miss_phase2[, miss_cols] <- NA
+ 	miss_phase2[, miss_cols] <- NA # set columns with missing data to all NA
  	data.mi2 <- rbind(data.mi, miss_phase2)
- 	full_phase_1 <- (1:nrow(data.mi2) %in% which(data$is.complete == 0))
- 	fake_phase_2 <- ((1:nrow(data.mi2)) %in% (nrow(data.mi) + 1):nrow(data.mi2))
+ 	full_phase_1 <- (1:nrow(data.mi2) %in% which(data[[missing_indicator]] == 0)) # idx of phase 1 data
+ 	fake_phase_2 <- ((1:nrow(data.mi2)) %in% (nrow(data.mi) + 1):nrow(data.mi2)) # idx of fake phase 2 data
  	data.mi <- data.mi2
   init <- mice::mice(data.mi, maxit = 0)
   pred.matrix <- init$predictorMatrix
@@ -192,7 +192,7 @@ run_raking_lr <- function(data = NULL, formula = "Y ~ X", NimpRaking = 50, calOp
     infMat_all[, , iter] <- inf.fun.logit(mifit)
 	}
   infMat <- rowMeans(infMat_all, dims = 2)
-  
+
   # choose raking variables and put relevant raking variables into data frame
   # default: generalized raking with all influence functions
   # rakeformula = ~ inf1 + ... + infk, where k = # coef fit by regression
@@ -202,7 +202,7 @@ run_raking_lr <- function(data = NULL, formula = "Y ~ X", NimpRaking = 50, calOp
     for (i in 1:coefnum) {
       varname <- paste0("inf", i)
       data$inf <- infMat[, i]
-      names(data)[names(data) == "inf"] <- varname 
+      names(data)[names(data) == "inf"] <- varname
       if (i > 1) {
         rakeformula <- paste0(rakeformula, "+", varname)
       }
@@ -223,12 +223,24 @@ run_raking_lr <- function(data = NULL, formula = "Y ~ X", NimpRaking = 50, calOp
   data2 <- data
   data2$ipw_wts <- ip_weights
   mydesign <- survey::twophase(
-    id = list(~1, ~1), subset = ~I(data2[[missing_indicator]] == 1), 
+    id = list(~1, ~1), subset = ~I(data2[[missing_indicator]] == 1),
     prob = list(NULL, ~I(1 / ipw_wts)), data = data2,
     pps = list(NULL, poisson_sampling(1 / data2$ipw_wts[data2[[missing_indicator]] == 1]))
   )
   infcal <- survey::calibrate(mydesign, formula = as.formula(rakeformula), phase = 2, calfun = "raking")
-  
+
+  # VERIFY
+  # sum(data2$infX[data2[[missing_indicator]] == 1])
+  # sum(as.numeric(weights(infcal))*data2$infX[data2[[missing_indicator]] == 1])
+  # sum(data2$infX)
+#
+  # # CHECK IF EIC SOLVED
+  # weights <- as.numeric(weights(infcal))
+  # weights_aug <- numeric(nrow(data))
+  # weights_aug[data[[missing_indicator]] == 1] <- weights
+  # weights_aug[data[[missing_indicator]] == 0] <- ip_weights[data[[missing_indicator]] == 0]
+  # mean(data2$infX*weights_aug*(data2$Delta-1/weights_aug))
+
   if (fam == "binomial") {
     rakefit <- survey::svyglm(formula, design = infcal, family = quasibinomial)
   }
