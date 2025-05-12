@@ -20,7 +20,7 @@ run <- function(Y_type,
                 true_Pi,
                 Q.family) {
   B <- 500
-  n_seq <- seq(500, 2000, 500)
+  n_seq <- 2000#seq(500, 2000, 500)
 
   res_df <- map_dfr(n_seq, function(.n) {
     map_dfr(seq(B), function(.b) {
@@ -47,7 +47,7 @@ run <- function(Y_type,
       if (true_Pi) {
         args_tmle$pi_oracle <- Pi
       }
-      res_tmle <- do.call("twoStageTMLE_imp_est", args_tmle)
+      res_tmle <- do.call("twoStageTMLE_plugin_tmle", args_tmle)
 
       # raking -----------------------------------------------------------------
       args_rak <- list(

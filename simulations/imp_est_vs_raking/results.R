@@ -3,7 +3,7 @@ library(knitr)
 library(kableExtra)
 source("sim_data.R")
 
-res_df <- read.csv("out/Y_simple_binomial_Delta_med_strong_0506_171041.csv")
+res_df <- read.csv("out/Y_simple_binomial_Delta_med_strong_0507_012310.csv")
 truth <- get_truth(Y_type = "simple_binomial")
 res_df %>%
   summarize(

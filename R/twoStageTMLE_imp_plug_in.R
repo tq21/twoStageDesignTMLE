@@ -1,13 +1,6 @@
-#' Plug-in imputation-based TMLE
-#'
-#' - Estimate Qn, gn via inverse weighting, get DFullNC estimate for Delta=1
-#' - Estimate E(DFullNC|Delta=1,V) using HAL
-#' - epsilon, one-dimensional path through Qn, evaluate P_n Delta/Pi_n DFullNC
-#' 1. Regress DFullNC on V, only on Delta=1 observations
-#' 2. Generate MI full data, run full data TMLE on each, obtain empirical EIC,
-#'    then average to get E(DFullNC|Delta=1,V)
-#' 3. Use MI to directly estimate E(DFullNC|Delta=1,V)
-twoStageTMLE_plugin_tmle <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
+#' Two-stage Design
+#' Imputation-based plug-in TMLE
+twoStageTMLE_imp_plug_in <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
                                      Delta = rep(1, length(Y)), pi=NULL, piform=NULL, pi_oracle=NULL,
                                      DFullReg_true = NULL,
                                      pi.SL.library = c("SL.glm", "SL.gam", "SL.glmnet", "tmle.SL.dbarts.k.5"),
@@ -87,29 +80,23 @@ twoStageTMLE_plugin_tmle <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   browser()
 
   # estimate Q
-  # Q_fit <- glm(Y[Delta.W == 1] ~ .,
-  #              data = data.frame(A = A[Delta.W==1], cbind(W[Delta.W==1, ,drop=FALSE], W.stage2)),
-  #              family = Q.family, weights = 1/res.twoStage$pi[Delta.W == 1])
-  # Q1W <- as.numeric(predict(Q_fit, newdata = data.frame(A = 1, cbind(W[Delta.W==1, ,drop=FALSE], W.stage2)), type = "response"))
-  # Q0W <- as.numeric(predict(Q_fit, newdata = data.frame(A = 0, cbind(W[Delta.W==1, ,drop=FALSE], W.stage2)), type = "response"))
-  # QAW <- Q1W*A[Delta.W == 1]+Q0W*(1-A[Delta.W == 1])
-#
-  # # estimate g
-  # g_fit <- glm(A[Delta.W == 1] ~ ., data = data.frame(cbind(W[Delta.W==1, ,drop=FALSE], W.stage2)),
-  #              family = Q.family, weights = 1/res.twoStage$pi[Delta.W == 1])
-  # g1W <- as.numeric(predict(g_fit, newdata = data.frame(cbind(W[Delta.W==1, ,drop=FALSE], W.stage2, type = "response"))))
-  # gbounds <- c(5/sqrt(length(A))/log(length(A)), 1-5/sqrt(length(A))/log(length(A)))
-  # g1W <- .bound(g1W, gbounds)
+  Q_fit <- glm(Y[Delta.W == 1] ~ .,
+               data = data.frame(A = A[Delta.W==1], cbind(W[Delta.W==1, ,drop=FALSE], W.stage2)),
+               family = Q.family, weights = 1/res.twoStage$pi[Delta.W == 1])
+  Q1W <- as.numeric(predict(Q_fit, newdata = data.frame(A = 1, cbind(W[Delta.W==1, ,drop=FALSE], W.stage2))))
+  Q0W <- as.numeric(predict(Q_fit, newdata = data.frame(A = 0, cbind(W[Delta.W==1, ,drop=FALSE], W.stage2))))
+  QAW <- Q1W*A[Delta.W == 1]+Q0W*(1-A[Delta.W == 1])
+
+  # estimate g
+  g_fit <- glm(A[Delta.W == 1] ~ ., data = data.frame(cbind(W[Delta.W==1, ,drop=FALSE], W.stage2)),
+               family = Q.family, weights = 1/res.twoStage$pi[Delta.W == 1])
+  g1W <- as.numeric(predict(g_fit, newdata = data.frame(cbind(W[Delta.W==1, ,drop=FALSE], W.stage2))))
 
   # compute clever covariates
-  g1W <- result$tmle$g$g1W
   HAW <- A[Delta.W==1]/g1W-(1-A[Delta.W==1])/(1-g1W)
   H1W <- 1/g1W; H0W <- -1/(1-g1W)
   GAW <- H1W-H0W-HAW^2
   K <- Delta.W/res.twoStage$pi
-  Q1W <- result$tmle$Qinit$Q[, "Q1W"]
-  Q0W <- result$tmle$Qinit$Q[, "Q0W"]
-  QAW <- Q1W*A[Delta.W == 1]+Q0W*(1-A[Delta.W == 1])
 
   # estimate m=E(DFullNC|Delta=1,V)
   DFullNC <- HAW*(Y[Delta.W==1]-QAW)+Q1W-Q0W
@@ -143,21 +130,17 @@ twoStageTMLE_plugin_tmle <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   # solve linear system
   gamma <- mean(K[Delta.W==1]*(GAW-GAWReg[Delta.W==1]))/mean(K[Delta.W==1]^2)
   delta <- mean(K[Delta.W==1]*(DFullNC-DFullNCReg[Delta.W==1]))/mean(K[Delta.W==1]^2)
-  numer <- mean(K[Delta.W==1]*(Q1W-Q0W)-DFullNCReg[Delta.W==1]-delta*K[Delta.W==1])
+  numer <- mean(K[Delta.W==1]*(Q1W-Q0W)-DFullNCReg-delta*K[Delta.W==1])
   denom <- mean(GAWReg[Delta.W==1]+gamma*K[Delta.W==1]-K[Delta.W==1]*(H1W-H0W))
   epsilon <- numer/denom
-
-  # updates
-  QAW_star <- QAW+epsilon*HAW
-  Q1W_star <- Q1W+epsilon*H1W
-  Q0W_star <- Q0W+epsilon*H0W
-  DFullNC_star <- DFullNC+epsilon*GAW
-  GAWReg_star <- GAWReg[Delta.W==1]+gamma*K[Delta.W==1]
-  DFullNCReg_star <- DFullNCReg[Delta.W==1]+epsilon*GAWReg_star+delta*K[Delta.W==1]
 
   # check PnEIC
   PnEIC_1 <- mean(K[Delta.W==1]*(DFullNC+epsilon*GAW-DFullNCReg[Delta.W==1]-epsilon*GAWReg[Delta.W==1]-delta*K[Delta.W==1]))
   PnEIC_2 <- mean(DFullNCReg[Delta.W==1]+epsilon*GAWReg[Delta.W==1]+delta*K[Delta.W==1])-mean(K[Delta.W==1]*(Q1W-Q0W+epsilon*(H1W-H0W)))
+
+
+
+
 
   # estimate non-centered EIC --------------------------------------------------
   # method 1: Regress DFullNC on V, only on Delta=1 observations
@@ -190,6 +173,68 @@ twoStageTMLE_plugin_tmle <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   result$psi_aipcw <- psi_aipcw
   result$lower_aipcw <- psi_aipcw_lower
   result$upper_aipcw <- psi_aipcw_upper
+
+  # method 2: Generate MI full data, run full data TMLE on each, obtain empirical EIC,
+  #           then average to get E(DFullNC|Delta=1,V)
+  Nimp <- 20
+  W.stage2_aug <- as.data.frame(matrix(NA, nrow = length(Y), ncol = ncol(W.stage2)))
+  W.stage2_aug[Delta.W == 1, ] <- W.stage2
+  names(W.stage2_aug) <- names(W.stage2)
+  df_mi <- data.frame(Y = Y,
+                      A = A,
+                      Delta.W = Delta.W,
+                      W,
+                      W.stage2_aug)
+  init <- mice::mice(df_mi, maxit = 0)
+  predM <- init$predictorMatrix
+  imp <- mice::mice(df_mi, predictorMatrix = predM, m = Nimp, maxit = 20, print = FALSE)
+  DFullNC_all <- matrix(0, nrow = length(Y), ncol = Nimp)
+  for (m in 1:Nimp) {
+    comp <- mice::complete(imp, m)
+    tmle_m <- tmle::tmle(Y = comp$Y,
+                         A = comp$A,
+                         W = cbind(comp[, colnames(W), drop = FALSE],
+                                   comp[, colnames(W.stage2), drop = FALSE]),
+                         family = Q.family,
+                         g.SL.library = c("SL.glm"),
+                         Q.SL.library = c("SL.glm"),
+                         verbose = FALSE)
+    Q1W_m <- tmle_m$Qinit$Q[, "Q1W"]
+    Q0W_m <- tmle_m$Qinit$Q[, "Q0W"]
+    QAW_m <- Q1W_m*A+Q0W_m*(1-A)
+    g1W_m <- tmle_m$g$g1W
+    DFullNC_all[, m] <- (A/g1W_m-(1-A)/(1-g1W_m))*(Y-QAW_m)+Q1W_m-Q0W_m
+  }
+  DFullNCReg_MI <- rowMeans(DFullNC_all)
+  DFullNCReg_MI <- estimateDFullReg_pool(DFull = DFullNCReg_MI,
+                                         Delta = Delta.W,
+                                         V = res.twoStage$d.pi,
+                                         DFullbounds = c(-Inf, Inf),
+                                         DFullform = NULL,
+                                         SL.library = DFullReg.library,
+                                         verbose = verbose,
+                                         discreteSL = TRUE,
+                                         Vfold = argList$V.Q)
+  DFullNCReg_MI <- DFullNCReg_MI$DFullReg
+  DFullNCReg_MI_R2 <- 1 - sum((DFullNC-DFullNCReg_MI[Delta.W == 1])^2)/sum((DFullNC-mean(DFullNC))^2)
+  result$DFullNCReg_MI_R2 <- DFullNCReg_MI_R2
+
+  # target DFullNCReg ----------------------------------------------------------
+  # method 1: Regress DFullNC on V, only on Delta=1 observations
+  #print(mean(1/res.twoStage$pi[Delta.W == 1]*(DFullNC - DFullNCReg[Delta.W == 1]))) # CHECK PT
+  H <- as.numeric(Delta.W/res.twoStage$pi)
+  epsilon <- coef(glm(DFullNC ~ -1 + offset(DFullNCReg[Delta.W == 1]) + H[Delta.W == 1], family = "gaussian"))
+  epsilon[is.na(epsilon)] <- 0
+  DFullNCReg[Delta.W == 1] <- DFullNCReg[Delta.W == 1] + epsilon * H[Delta.W == 1]
+  #print(mean(1/res.twoStage$pi[Delta.W == 1]*(DFullNC - DFullNCReg[Delta.W == 1]))) # CHECK PT
+
+  # method 2: Generate MI full data, run full data TMLE on each, obtain empirical EIC,
+  #           then average to get E(DFullNC|Delta=1,V)
+  #print(mean(1/res.twoStage$pi[Delta.W == 1]*(DFullNC - DFullNCReg_MI[Delta.W == 1]))) # CHECK PT
+  epsilon <- coef(glm(DFullNC ~ -1 + offset(DFullNCReg_MI[Delta.W == 1]) + H[Delta.W == 1], family = "gaussian"))
+  epsilon[is.na(epsilon)] <- 0
+  DFullNCReg_MI[Delta.W == 1] <- DFullNCReg_MI[Delta.W == 1] + epsilon * H[Delta.W == 1]
+  #print(mean(1/res.twoStage$pi[Delta.W == 1]*(DFullNC - DFullNCReg_MI[Delta.W == 1]))) # CHECK PT
 
   # point estimate and inference -----------------------------------------------
   psi <- mean(DFullNCReg[Delta.W == 1])

@@ -11,7 +11,7 @@ run <- function(Y_type,
                 true_Pi,
                 Q.family) {
   B <- 10#100
-  n_seq <- 500#seq(1000, 4000, 1000)
+  n_seq <- 3000#seq(1000, 4000, 1000)
 
   res_df <- map_dfr(n_seq, function(.n) {
     map_dfr(seq(B), function(.b) {
