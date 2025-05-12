@@ -7,16 +7,16 @@
 #' 2. Generate MI full data, run full data TMLE on each, obtain empirical EIC,
 #'    then average to get E(DFullNC|Delta=1,V)
 #' 3. Use MI to directly estimate E(DFullNC|Delta=1,V)
-twoStageTMLE_plugin_tmle <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
-                                     Delta = rep(1, length(Y)), pi=NULL, piform=NULL, pi_oracle=NULL,
-                                     DFullReg_true = NULL,
-                                     pi.SL.library = c("SL.glm", "SL.gam", "SL.glmnet", "tmle.SL.dbarts.k.5"),
-                                     DFullReg.library = c("SL.glm", "SL.glmnet", "SL.gam", "tmle.SL.dbarts2"),
-                                     V.pi=10, pi.discreteSL = TRUE, condSetNames = c("A","W","Y"), id = NULL,
-                                     Q.family = "gaussian", augmentW = TRUE,
-                                     augW.SL.library = c("SL.glm", "SL.glmnet", "tmle.SL.dbarts2"),
-                                     rareOutcome=FALSE,
-                                     verbose=FALSE, browse=FALSE, ...) {
+twoStageTMLE_plugin_tmle_SL <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
+                                        Delta = rep(1, length(Y)), pi=NULL, piform=NULL, pi_oracle=NULL,
+                                        DFullReg_true = NULL,
+                                        pi.SL.library = c("SL.glm", "SL.gam", "SL.glmnet", "tmle.SL.dbarts.k.5"),
+                                        DFullReg.library = c("SL.glm", "SL.glmnet", "SL.gam", "tmle.SL.dbarts2"),
+                                        V.pi=10, pi.discreteSL = TRUE, condSetNames = c("A","W","Y"), id = NULL,
+                                        Q.family = "gaussian", augmentW = TRUE,
+                                        augW.SL.library = c("SL.glm", "SL.glmnet", "tmle.SL.dbarts2"),
+                                        rareOutcome=FALSE,
+                                        verbose=FALSE, browse=FALSE, ...) {
 
   if (browse) browser()
 
@@ -83,8 +83,6 @@ twoStageTMLE_plugin_tmle <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   }
   result <- list()
   result$tmle <- try(do.call(tmle::tmle, argList))
-
-  browser()
 
   # estimate Q
   # Q_fit <- glm(Y[Delta.W == 1] ~ .,
@@ -159,29 +157,17 @@ twoStageTMLE_plugin_tmle <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   PnEIC_1 <- mean(K[Delta.W==1]*(DFullNC+epsilon*GAW-DFullNCReg[Delta.W==1]-epsilon*GAWReg[Delta.W==1]-delta*K[Delta.W==1]))
   PnEIC_2 <- mean(DFullNCReg[Delta.W==1]+epsilon*GAWReg[Delta.W==1]+delta*K[Delta.W==1])-mean(K[Delta.W==1]*(Q1W-Q0W+epsilon*(H1W-H0W)))
 
-  # estimate non-centered EIC --------------------------------------------------
-  # method 1: Regress DFullNC on V, only on Delta=1 observations
-  Q1W <- result$tmle$Qinit$Q[, "Q1W"]
-  Q0W <- result$tmle$Qinit$Q[, "Q0W"]
-  QAW <- Q1W*A[Delta.W == 1]+Q0W*(1-A[Delta.W == 1])
-  g1W <- result$tmle$g$g1W
-  DFullNC <- (A[Delta.W == 1]/g1W-(1-A[Delta.W == 1])/(1-g1W))*(Y[Delta.W == 1]-QAW)+Q1W-Q0W
-  DFullNCReg <- estimateDfullReg(DFull = DFullNC,
-                                 Delta = Delta.W,
-                                 V = res.twoStage$d.pi,
-                                 DFullbounds = c(-Inf, Inf),
-                                 DFullform = NULL,
-                                 SL.library = DFullReg.library,
-                                 verbose = verbose,
-                                 discreteSL = TRUE,
-                                 Vfold = argList$V.Q)
-  DFullNCReg <- DFullNCReg$DFullReg
-  DFullNCReg_R2 <- 1 - sum((DFullNC-DFullNCReg[Delta.W == 1])^2)/sum((DFullNC-mean(DFullNC))^2)
-  result$DFullNCReg_R2 <- DFullNCReg_R2
-
-  # A-IPCW
+  # point estimate and inference
+  psi <- mean(DFullNCReg_star)
   DFullNC_aug <- numeric(length(Delta.W))
-  DFullNC_aug[Delta.W == 1] <- DFullNC
+  DFullNC_aug[Delta.W == 1] <- DFullNC_star
+  result$eic <- as.numeric(1/res.twoStage$pi[Delta.W==1]*(DFullNC_star-DFullNCReg_star)+DFullNCReg_star-psi)
+  se <- sqrt(var(result$eic, na.rm = TRUE) / sum(Delta.W))
+  result$psi <- psi
+  result$lower <- psi + qnorm(0.025) * se
+  result$upper <- psi + qnorm(0.975) * se
+
+  # A-IPCW ---------------------------------------------------------------------
   psi_aipcw <- mean(Delta.W/res.twoStage$pi*(DFullNC_aug-DFullNCReg)+DFullNCReg)
   eic_aipcw <- Delta.W/res.twoStage$pi*(DFullNC_aug-DFullNCReg)+DFullNCReg-psi_aipcw
   se_aipcw <- sqrt(var(eic_aipcw, na.rm = TRUE) / length(Delta.W))
@@ -190,22 +176,6 @@ twoStageTMLE_plugin_tmle <- function(Y, A, W, Delta.W, W.stage2, Z=NULL,
   result$psi_aipcw <- psi_aipcw
   result$lower_aipcw <- psi_aipcw_lower
   result$upper_aipcw <- psi_aipcw_upper
-
-  # point estimate and inference -----------------------------------------------
-  psi <- mean(DFullNCReg[Delta.W == 1])
-  psi_MI <- mean(DFullNCReg_MI[Delta.W == 1])
-  DFullNC_aug <- numeric(length(DFullNCReg))
-  DFullNC_aug[Delta.W == 1] <- DFullNC
-  result$eic <- as.numeric(Delta.W/res.twoStage$pi)*(DFullNC_aug-DFullNCReg)+DFullNCReg-psi
-  result$eic_MI <- as.numeric(Delta.W/res.twoStage$pi)*(DFullNC_aug-DFullNCReg_MI)+DFullNCReg_MI-psi_MI
-  se <- sqrt(var(result$eic, na.rm = TRUE) / length(Delta.W))
-  se_MI <- sqrt(var(result$eic_MI, na.rm = TRUE) / length(Delta.W))
-  result$psi <- psi
-  result$psi_MI <- psi_MI
-  result$lower <- psi + qnorm(0.025) * se
-  result$lower_MI <- psi_MI + qnorm(0.025) * se_MI
-  result$upper <- psi + qnorm(0.975) * se
-  result$upper_MI <- psi_MI + qnorm(0.975) * se_MI
 
   result$twoStage <- res.twoStage
   result$augW <- W.Q

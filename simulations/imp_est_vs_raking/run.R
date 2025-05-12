@@ -19,8 +19,8 @@ run <- function(Y_type,
                 Delta_type,
                 true_Pi,
                 Q.family) {
-  B <- 500
-  n_seq <- 2000#seq(500, 2000, 500)
+  B <- 50#500
+  n_seq <- 500#seq(500, 2000, 500)
 
   res_df <- map_dfr(n_seq, function(.n) {
     map_dfr(seq(B), function(.b) {
@@ -47,7 +47,7 @@ run <- function(Y_type,
       if (true_Pi) {
         args_tmle$pi_oracle <- Pi
       }
-      res_tmle <- do.call("twoStageTMLE_plugin_tmle", args_tmle)
+      res_tmle <- do.call("twoStageTMLE_plugin_tmle_MI", args_tmle)
 
       # raking -----------------------------------------------------------------
       args_rak <- list(
@@ -67,20 +67,20 @@ run <- function(Y_type,
       return(data.frame(n = .n,
                         b = .b,
                         est_name = c("IPCW-TMLE",
-                                     "IPCW-TMLE-SL",
-                                     "IPCW-TMLE-MI",
+                                     "IPCW-TMLE-imp-plugin-MI",
+                                     "A-IPCW",
                                      "raking"),
                         psi = c(res_tmle$tmle$estimates$ATE$psi,
                                 res_tmle$psi,
-                                res_tmle$psi_MI,
+                                res_tmle$psi_aipcw,
                                 res_rak$results[res_rak$results$estimand == "RD", "est"]),
                         lower = c(res_tmle$tmle$estimates$ATE$CI[1],
                                   res_tmle$lower,
-                                  res_tmle$lower_MI,
+                                  res_tmle$lower_aipcw,
                                   res_rak$results[res_rak$results$estimand == "RD", "est"]+qnorm(0.025)*res_rak$results[res_rak$results$estimand == "RD", "SE"]),
                         upper = c(res_tmle$tmle$estimates$ATE$CI[2],
                                   res_tmle$upper,
-                                  res_tmle$upper_MI,
+                                  res_tmle$upper_aipcw,
                                   res_rak$results[res_rak$results$estimand == "RD", "est"]+qnorm(0.975)*res_rak$results[res_rak$results$estimand == "RD", "SE"])))
     })
   })
