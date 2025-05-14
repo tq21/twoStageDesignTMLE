@@ -24,26 +24,26 @@ res_df <- map_dfr(n_seq, function(.n) {
     print("n: " %+% .n %+% ", b: " %+% .b %+% "...")
     data <- sim_data(.n)
 
-    res_tmle <- twoStageTMLE_plugin_likelihood(Y = data$Y,
-                                               A = data$A,
-                                               W = data[, c("W1", "W2"), drop = FALSE],
-                                               W_all = data[, c("W1", "W2", "W3"), drop = FALSE],
-                                               W.stage2 = data[complete.cases(data), c("W3"), drop = FALSE],
-                                               Delta.W = data$Delta,
-                                               condSetNames = c("W", "A", "Y"),
-                                               pi.SL.library = "SL.glm", V.pi = 10,
-                                               Q.family = Q.family,
-                                               Q.SL.library = "SL.glm", V.Q = 10,
-                                               g.SL.library = "SL.glm", V.g = 10,
-                                               augmentW = FALSE,
-                                               verbose = FALSE,
-                                               browse = FALSE)
+    res_tmle <- twoStageTMLE_plugin_MI(Y = data$Y,
+                                       A = data$A,
+                                       W = data[, c("W1", "W2"), drop = FALSE],
+                                       W_all = data[, c("W1", "W2", "W3"), drop = FALSE],
+                                       W.stage2 = data[complete.cases(data), c("W3"), drop = FALSE],
+                                       Delta.W = data$Delta,
+                                       condSetNames = c("W", "A", "Y"),
+                                       pi.SL.library = "SL.glm", V.pi = 10,
+                                       Q.family = Q.family,
+                                       Q.SL.library = "SL.glm", V.Q = 10,
+                                       g.SL.library = "SL.glm", V.g = 10,
+                                       augmentW = FALSE,
+                                       verbose = FALSE,
+                                       browse = FALSE)
 
     # raking -----------------------------------------------------------------
     args_rak <- list(
       data = data,
-      formula = "Y ~ A + W1 + W2 + W3 + W4 + W5",
-      miss_formula = "Delta ~ A + W1 + W2 + W3 + W4",
+      formula = "Y ~ A + W1 + W2 + W3",
+      miss_formula = "Delta ~ A + W1 + W2",
       NimpRaking = 20,
       calOption = 1,
       fam = Q.family,

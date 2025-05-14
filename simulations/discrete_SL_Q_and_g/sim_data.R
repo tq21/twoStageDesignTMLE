@@ -9,7 +9,7 @@ sim_data <- function(n,
     A <- rep(A_counter, n)
   }
 
-  Y <- rbinom(n, 1, plogis(A-4*W1-1.5*W2+0.5*W3))
+  Y <- rbinom(n, 1, plogis(A-4*W1-1.5*W2+0.5*W3+2*sin(3*W1*W2)-1.2*cos(W3^2)+0.8*A*W1-0.5*A*W2^2))
   Delta <- rbinom(n, 1, plogis(-0.5*W1+0.5*W2))
   W3[Delta == 0] <- NA
 
