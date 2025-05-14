@@ -16,7 +16,7 @@ learn_Q_g_SL <- function(W1,
                          nfolds = 5) {
 
   folds <- make_folds(n = length(Y), V = nfolds, strata_ids = Delta)
-  W_names <- c(names(W1), names(W2))
+  W_names <- names(W)
 
   V <- cbind(W2, A=A, Y=Y)
   W_A <- cbind(W, A=A)

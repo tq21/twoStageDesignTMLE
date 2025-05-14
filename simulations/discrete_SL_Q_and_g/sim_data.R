@@ -20,3 +20,9 @@ sim_data <- function(n,
                     Y = Y,
                     Delta = Delta))
 }
+
+get_truth <- function() {
+  data_A1 <- sim_data(1e7, A_counter = 1)
+  data_A0 <- sim_data(1e7, A_counter = 0)
+  return(mean(data_A1$Y-data_A0$Y))
+}
