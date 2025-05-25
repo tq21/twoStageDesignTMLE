@@ -188,8 +188,8 @@ run_raking_lr <- function(data = NULL, formula = "Y ~ X", NimpRaking = 50, calOp
 		impData_i[phase_2_indx, ] <- imp_init[fake_phase_2, ]
     if (fam == "binomial") {
       mifit <- glm(formula = as.formula(formula), family = binomial, data = impData_i)
+      infMat_all[, , iter] <- inf.fun.logit(mifit)
     }
-    infMat_all[, , iter] <- inf.fun.logit(mifit)
 	}
   infMat <- rowMeans(infMat_all, dims = 2)
 
@@ -243,6 +243,8 @@ run_raking_lr <- function(data = NULL, formula = "Y ~ X", NimpRaking = 50, calOp
 
   if (fam == "binomial") {
     rakefit <- survey::svyglm(formula, design = infcal, family = quasibinomial)
+  } else if (fam == "gaussian") {
+    rakefit <- survey::svyglm(formula, design = infcal, family = gaussian)
   }
 	est <- coef(rakefit)[coefficient_of_interest]
 	se <- summary(rakefit)$coef[coefficient_of_interest, 2]
