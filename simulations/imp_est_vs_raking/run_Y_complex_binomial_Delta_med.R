@@ -1,8 +1,8 @@
 source("run.R")
 timestamp <- format(Sys.Date(), "%m%d") %+% "_" %+% format(Sys.time(), "%H%M%S")
 
-Y_type <- "complex_binomial"
-Delta_type <- "med"
+Y_type <- "simple_binomial"
+Delta_type <- "med_strong"
 Q.family <- "binomial"
 res_df <- run(Y_type = Y_type,
               Delta_type = Delta_type,

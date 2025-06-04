@@ -2,17 +2,26 @@ sim_data <- function(n,
                      Y_type,
                      Delta_type,
                      A_counter = -1) {
-  W1 <- runif(n, -1, 1)
-  W2 <- runif(n, -1, 1)
-  W3 <- runif(n, -1, 1)
-  W4 <- runif(n, -1, 1)
-  W5 <- runif(n, -1, 1)
+  # latent
+  Z1 <- rnorm(n, 0, 1)
+  Z2 <- rnorm(n, 0, 1)
+  Z3 <- rnorm(n, 0, 1)
+  Z4 <- rnorm(n, 0, 1)
+
+  # observed
+  W1 <- exp(Z1/2)
+  W2 <- Z2/(1+exp(Z1))+10
+  W3 <- (Z1*Z3/25+0.6)^3
+  W4 <- (Z2+Z4+20)^2
+
   UY <- rnorm(n, 0, 1)
   if (A_counter == -1) {
-    A <- rbinom(n, 1, plogis(-W1-W2+W3+W4))
+    A <- rbinom(n, 1, plogis(-0.2*Z1-0.6*Z2+0.9*Z4))
   } else {
     A <- rep(A_counter, n)
   }
+
+  # hinge <- function(X, u) as.numeric(X >= u)*(X-u)
 
   # outcome regression
   if (Y_type == "simple_gaussian") {
@@ -22,9 +31,10 @@ sim_data <- function(n,
     # gaussian, non-linear
     Y <- 0.1*A-W1-0.8*W2-0.8*W5+UY
   } else if (Y_type == "simple_binomial") {
-    Y <- rbinom(n, 1, plogis(A-4*W1-1.5*W2+W5))
+    Y <- rbinom(n, 1, plogis(-2.25+0.45*A-0.2*Z1-0.4*Z2-0.4*Z3+0.50*Z4))
   } else if (Y_type == "complex_binomial") {
-    Y <- rbinom(n, 1, plogis(A-4*W1+A*W1-1.5*W2*W1+sin(W5)))
+    #Y_logit <- 0.2*A-4*hinge(Z1,0.5)+0.4*hinge(Z2,0.2)*hinge(Z4,-0.5)+sin(2*pi*Z1)+cos(2*pi*Z2)
+    #Y <- rbinom(n, 1, plogis(Y_logit))
   } else if (Y_type == "rare") {
     Y <- rbinom(n, 1, plogis(-A-4*abs(W1)-abs(W2)-abs(W5)))
   }
@@ -32,24 +42,24 @@ sim_data <- function(n,
   # missing mechanism
   if (Delta_type == "med") {
     # ~50% missing
-    Pi <- plogis(-0.5*W1+0.5*W2)
+    Pi <- plogis(-0.5*Z1+0.5*Z2)
     Delta <- rbinom(n, 1, Pi)
   } else if (Delta_type == "med_strong") {
     # ~50% missing, strongly predictive
-    Pi <- plogis(-6*W1+6*W2)
+    #Pi <- plogis(-6*hinge(Z1,0.4)*hinge(Z2,-0.4)+6*Z2^2-6*Z1-6*abs(Z1))
+    Pi <- plogis(-1.5*Z1+1.5*Z2)
     Delta <- rbinom(n, 1, Pi)
   } else if (Delta_type == "large") {
     # ~80% missing
     Pi <- plogis(-2.3*abs(W1)-0.5*abs(W2))
     Delta <- rbinom(n, 1, Pi)
   }
-  W5[Delta == 0] <- NA
+  W4[Delta == 0] <- NA
 
   return(list(data = data.frame(W1 = W1,
                                 W2 = W2,
                                 W3 = W3,
                                 W4 = W4,
-                                W5 = W5,
                                 A = A,
                                 Y = Y,
                                 Delta = Delta),

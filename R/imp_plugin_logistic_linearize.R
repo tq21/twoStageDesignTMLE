@@ -7,9 +7,7 @@
 #' 2. Generate MI full data, run full data TMLE on each, obtain empirical EIC,
 #'    then average to get E(DFullNC|Delta=1,V)
 #' 3. Use MI to directly estimate E(DFullNC|Delta=1,V)
-imp_plugin <- function(Y, A, W, W_all, Delta.W, W.stage2,
-                       QAW=NULL, Q0W=NULL, Q1W=NULL, g1W=NULL,
-                       pool=TRUE,
+imp_plugin <- function(Y, A, W, W_all, Delta.W, W.stage2, pool=TRUE,
                        Z=NULL, Delta = rep(1, length(Y)), pi=NULL, piform=NULL, pi_oracle=NULL,
                        DFullReg_true = NULL,
                        pi.SL.library = c("SL.glm", "SL.gam", "SL.glmnet", "tmle.SL.dbarts.k.5"),
@@ -87,43 +85,41 @@ imp_plugin <- function(Y, A, W, W_all, Delta.W, W.stage2,
   result <- list()
   result$tmle <- try(do.call(tmle::tmle, argList))
 
-  if (is.null(QAW)) {
-    Nimp <- 20
-    W.stage2_aug <- as.data.frame(matrix(NA, nrow = length(Y), ncol = ncol(W.stage2)))
-    W.stage2_aug[Delta.W == 1, ] <- W.stage2
-    names(W.stage2_aug) <- names(W.stage2)
-    df_mi <- data.frame(Y = Y,
-                        A = A,
-                        Delta.W = Delta.W,
-                        W,
-                        W.stage2_aug)
-    init <- mice::mice(df_mi, maxit = 0)
-    predM <- init$predictorMatrix
-    imp <- mice::mice(df_mi, predictorMatrix = predM, m = Nimp, maxit = 20, print = FALSE)
-    Q1W_all <- Q0W_all <- QAW_all <- g1W_all <- matrix(0, nrow = length(Y), ncol = Nimp)
+  Nimp <- 20
+  W.stage2_aug <- as.data.frame(matrix(NA, nrow = length(Y), ncol = ncol(W.stage2)))
+  W.stage2_aug[Delta.W == 1, ] <- W.stage2
+  names(W.stage2_aug) <- names(W.stage2)
+  df_mi <- data.frame(Y = Y,
+                      A = A,
+                      Delta.W = Delta.W,
+                      W,
+                      W.stage2_aug)
+  init <- mice::mice(df_mi, maxit = 0)
+  predM <- init$predictorMatrix
+  imp <- mice::mice(df_mi, predictorMatrix = predM, m = Nimp, maxit = 20, print = FALSE)
+  Q1W_all <- Q0W_all <- QAW_all <- g1W_all <- matrix(0, nrow = length(Y), ncol = Nimp)
 
-    for (m in 1:Nimp) {
-      comp <- mice::complete(imp, m)
-      tmle_m <- tmle::tmle(Y = comp$Y,
-                           A = comp$A,
-                           W = cbind(comp[, colnames(W), drop = FALSE],
-                                     comp[, colnames(W.stage2), drop = FALSE]),
-                           family = Q.family,
-                           g.SL.library = c("SL.glm"),
-                           Q.SL.library = c("SL.glm"),
-                           verbose = FALSE)
-      Q1W_m <- tmle_m$Qinit$Q[, "Q1W"]
-      Q0W_m <- tmle_m$Qinit$Q[, "Q0W"]
-      QAW_m <- Q1W_m*A+Q0W_m*(1-A)
-      g1W_m <- tmle_m$g$g1W
+  for (m in 1:Nimp) {
+    comp <- mice::complete(imp, m)
+    tmle_m <- tmle::tmle(Y = comp$Y,
+                         A = comp$A,
+                         W = cbind(comp[, colnames(W), drop = FALSE],
+                                   comp[, colnames(W.stage2), drop = FALSE]),
+                         family = Q.family,
+                         g.SL.library = c("SL.glm"),
+                         Q.SL.library = c("SL.glm"),
+                         verbose = FALSE)
+    Q1W_m <- tmle_m$Qinit$Q[, "Q1W"]
+    Q0W_m <- tmle_m$Qinit$Q[, "Q0W"]
+    QAW_m <- Q1W_m*A+Q0W_m*(1-A)
+    g1W_m <- tmle_m$g$g1W
 
-      Q1W_all[, m] <- Q1W_m; Q0W_all[, m] <- Q0W_m; QAW_all[, m] <- QAW_m
-      g1W_all[, m] <- g1W_m
-    }
-
-    Q1W <- rowMeans(Q1W_all); Q0W <- rowMeans(Q0W_all); QAW <- rowMeans(QAW_all)
-    g1W <- rowMeans(g1W_all)
+    Q1W_all[, m] <- Q1W_m; Q0W_all[, m] <- Q0W_m; QAW_all[, m] <- QAW_m
+    g1W_all[, m] <- g1W_m
   }
+
+  Q1W <- rowMeans(Q1W_all); Q0W <- rowMeans(Q0W_all); QAW <- rowMeans(QAW_all)
+  g1W <- rowMeans(g1W_all)
 
   H1W <- 1/g1W; H0W <- -1/(1-g1W); HAW <- A/g1W-(1-A)/(1-g1W)
   DFullNC <- HAW*(Y-QAW)+Q1W-Q0W

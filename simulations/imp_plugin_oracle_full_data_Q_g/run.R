@@ -19,8 +19,8 @@ run <- function(Y_type,
                 Delta_type,
                 true_Pi,
                 Q.family) {
-  B <- 50#100
-  n_seq <- 500#seq(1000, 4000, 1000)
+  B <- 100#100
+  n_seq <- 1000#seq(1000, 4000, 1000)
 
   res_df <- map_dfr(n_seq, function(.n) {
     map_dfr(seq(B), function(.b) {
@@ -34,10 +34,10 @@ run <- function(Y_type,
                         W = data[, c("W1", "W2", "W3", "W4"), drop = FALSE],
                         W.stage2 = data[complete.cases(data), c("W5"), drop = FALSE],
                         Delta.W = data$Delta,
-                        #QAW = data$QAW,
-                        #Q0W = data$Q0W,
-                        #Q1W = data$Q1W,
-                        #g1W = data$g1W,
+                        QAW = data$QAW,
+                        Q0W = data$Q0W,
+                        Q1W = data$Q1W,
+                        g1W = data$g1W,
                         condSetNames = c("W", "A", "Y"),
                         pi.SL.library = "SL.glm", V.pi = 10,
                         Q.family = Q.family,

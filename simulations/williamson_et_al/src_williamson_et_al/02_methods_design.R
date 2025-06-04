@@ -151,14 +151,20 @@ run_RRZ_lr <- function(data = NULL, outcome_formula = "Y~X+Zs+Zw+Ws_obs", cal_fo
 # @param fam the outcome regression family
 # @return a list with the parameter estimate and standard error (in a data.frame) and the fitted model
 run_raking_lr <- function(data = NULL, formula = "Y ~ X", NimpRaking = 50, calOption = 1,
+                          pi = NULL,
                           start_from_ipw = FALSE, rake_on_y = FALSE,
                           miss_formula = "is.complete ~ X + Y",
                           coefficient_of_interest = "X", missing_indicator = "is.complete",
                           fam = "binomial") {
   # get initial weights
-  miss_fit <- glm(formula = as.formula(miss_formula), family = "binomial", data = data)
-  p_obs <- predict(miss_fit, type = "response")
-  ip_weights <- 1 / p_obs
+  if (is.null(pi)) {
+    miss_fit <- glm(formula = as.formula(miss_formula), family = "binomial", data = data)
+    p_obs <- predict(miss_fit, type = "response")
+    ip_weights <- 1 / p_obs
+  } else {
+    ip_weights <- 1 / pi
+  }
+
   # Count parameters in outcome model
   if (fam == "binomial") {
     initfit <- glm(formula = as.formula(formula), family = "binomial", data = data)
@@ -243,8 +249,6 @@ run_raking_lr <- function(data = NULL, formula = "Y ~ X", NimpRaking = 50, calOp
 
   if (fam == "binomial") {
     rakefit <- survey::svyglm(formula, design = infcal, family = quasibinomial)
-  } else if (fam == "gaussian") {
-    rakefit <- survey::svyglm(formula, design = infcal, family = gaussian)
   }
 	est <- coef(rakefit)[coefficient_of_interest]
 	se <- summary(rakefit)$coef[coefficient_of_interest, 2]

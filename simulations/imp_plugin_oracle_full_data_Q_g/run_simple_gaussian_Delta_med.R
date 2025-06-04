@@ -6,7 +6,7 @@ Delta_type <- "med"
 Q.family <- "binomial"
 res_df <- run(Y_type = Y_type,
               Delta_type = Delta_type,
-              true_Pi = FALSE,
+              true_Pi = TRUE,
               Q.family = Q.family)
 
 write.csv(res_df,

@@ -19,8 +19,8 @@ run <- function(Y_type,
                 Delta_type,
                 true_Pi,
                 Q.family) {
-  B <- 50#500
-  n_seq <- 500#seq(500, 2000, 500)
+  B <- 100#500
+  n_seq <- 2000#seq(500, 2000, 500)
 
   res_df <- map_dfr(n_seq, function(.n) {
     map_dfr(seq(B), function(.b) {
@@ -32,8 +32,8 @@ run <- function(Y_type,
       args_tmle <- list(
         Y = data$Y,
         A = data$A,
-        W = data[, c("W1", "W2", "W3", "W4"), drop = FALSE],
-        W.stage2 = data[complete.cases(data), c("W5"), drop = FALSE],
+        W = data[, c("W1", "W2", "W3"), drop = FALSE],
+        W.stage2 = data[complete.cases(data), c("W4"), drop = FALSE],
         Delta.W = data$Delta,
         condSetNames = c("W", "A", "Y"),
         pi.SL.library = "SL.glm", V.pi = 10,
@@ -47,13 +47,13 @@ run <- function(Y_type,
       if (true_Pi) {
         args_tmle$pi_oracle <- Pi
       }
-      res_tmle <- do.call("twoStageTMLE_plugin_tmle_MI", args_tmle)
+      res_tmle <- do.call("imp_plugin_logistic", args_tmle)
 
       # raking -----------------------------------------------------------------
       args_rak <- list(
         data = data,
-        formula = "Y ~ A + W1 + W2 + W3 + W4 + W5",
-        miss_formula = "Delta ~ A + W1 + W2 + W3 + W4",
+        formula = "Y ~ A + W1 + W2 + W3 + W4",
+        miss_formula = "Delta ~ A + W1 + W2 + W3",
         NimpRaking = 20,
         calOption = 1,
         fam = Q.family,
