@@ -54,7 +54,10 @@ investigate_performance_once <- function(mc_id = 1, n = 100, XScenario = 1, YSce
                                          plasmode = FALSE,
                                          data_dir = "./", filename_prefix = "data_m1_y1_x1_n10000_id",
                                          filename_suffix = ".rds", read_func = readRDS,
-                                         rare_outcome = FALSE) {
+                                         rare_outcome = FALSE,
+                                         browse = FALSE) {
+  if (browse) browser()
+
   # generate a dataset
   if (is.null(cached_datasets)) {
     df <- gen_data(N = n, XScenario = XScenario, YScenario = YScenario, missScenario = missScenario, lowcor = lowcor, midcor = midcor, highcor = highcor, gencor = gencor)
@@ -124,7 +127,8 @@ investigate_performance_once <- function(mc_id = 1, n = 100, XScenario = 1, YSce
         miss_formula = miss_formula, miss_formula_factor = miss_formula_factor,
         fam = fam, obs_vars = obs_vars, tmle_args = tmle_args, mi_args = mi_args,
         raking_args = raking_args, outcome_name = outcome_name,
-        tx_name = tx_name, missing_indicator = missing_indicator, plasmode = plasmode
+        tx_name = tx_name, missing_indicator = missing_indicator, plasmode = plasmode,
+        browse = browse
       )
     })
     if ((any(grepl("gr", estimators)) | any(grepl("rak", estimators))) & plasmode) {
@@ -166,7 +170,9 @@ run_one_estimator <- function(estimator, df, oracle_formula,
                               tx_formula, tx_formula_factor, obs_vars, tmle_args, mi_args,
                               raking_args, outcome_name = "Y", tx_name = "X",
                               missing_indicator = "is.complete", plasmode = FALSE,
-                              fam = "binomial") {
+                              fam = "binomial", browse = FALSE) {
+  if (browse) browser()
+
   # complete-case estimators
   if (grepl("CC", estimator, ignore.case = TRUE) | grepl("population", estimator, ignore.case = TRUE)) {
     if (grepl("oracle", estimator)) {
@@ -249,8 +255,7 @@ run_one_estimator <- function(estimator, df, oracle_formula,
   }
   # raking
   else if (grepl("rak", estimator, ignore.case = TRUE) | grepl("gr", estimator, ignore.case = TRUE)) {
-    #cal_option <- 1
-    cal_option <- 2
+    cal_option <- 1
     if (grepl("X", estimator, ignore.case = TRUE)) {
       cal_option <- 2
     }
@@ -265,8 +270,8 @@ run_one_estimator <- function(estimator, df, oracle_formula,
     output <- list()
     output$results <- data.frame(est = "raking",
                                  psi = tmp$results[tmp$results$estimand == "RD", "est"],
-                                 lower = tmp$results[tmp$results$estimand == "RD", "est"]-1.96*tmp$results[tmp$results$estimand == "RD", "SE"],
-                                 upper = tmp$results[tmp$results$estimand == "RD", "est"]+1.96*tmp$results[tmp$results$estimand == "RD", "SE"])
+                                 lower = tmp$results[tmp$results$estimand == "RD", "est"]+qnorm(0.025)*tmp$results[tmp$results$estimand == "RD", "SE"],
+                                 upper = tmp$results[tmp$results$estimand == "RD", "est"]+qnorm(0.975)*tmp$results[tmp$results$estimand == "RD", "SE"])
   }
   # IPCW-TMLE: ver 0
   else if (estimator == "ipcw-tmle-ver-0") {

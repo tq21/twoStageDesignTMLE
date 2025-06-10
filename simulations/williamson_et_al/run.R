@@ -16,60 +16,73 @@ source("src_williamson_et_al/01_generate_data.R")
 source("src_williamson_et_al/02_methods_design.R")
 source("src_williamson_et_al/02_methods_tmle.R")
 source("src_williamson_et_al/03_estimate.R")
-set.seed(123)
 
-B <- 100
-n_seq <- 500#seq(500, 2000, 500)
+est_name <- "rak"
+xscenario <- 1
+yscenario <- 1
+mscenario <- 1
 
-run <- function(est_name) {
+#' function to run simulation
+#'
+#' @param est_name name of the estimator to run
+#' @param xscenario scenario for X
+#' @param yscenario scenario for Y
+#' @param mscenario scenario for missingness
+#' @param B number of Monte-Carlo runs for each sample size
+#' @param n_seq sequence of sample sizes to run
+#' @param seed seed for random number generation
+run <- function(est_name,
+                xscenario,
+                yscenario,
+                mscenario,
+                B,
+                n_seq,
+                seed) {
+
+  set.seed(seed)
+  print("running estimator: " %+% est_name)
+  print("X scenario: " %+% xscenario %+%
+        ", Y scenario: " %+% yscenario %+%
+        ", missing scenario: " %+% mscenario)
+
   res_df <- map_dfr(n_seq, function(.n) {
     map_dfr(seq(B), function(.b) {
       print("n: " %+% .n %+% ", b: " %+% .b %+% "...")
 
-      estimators <- "rak"
-      if (est_name == "ver_0") {
-        estimators <- c("ipcw-tmle-ver-0", estimators)
-      } else if (est_name == "ver_1") {
-        estimators <- c("ipcw-tmle-ver-1", estimators)
-      } else if (est_name == "ver_2") {
-        estimators <- c("ipcw-tmle-ver-2", estimators)
-      } else if (est_name == "ver_3") {
-        estimators <- c("ipcw-tmle-ver-3", estimators)
-      } else if (est_name == "plugin_ver_0") {
-        estimators <- c("ipcw-tmle-plugin-ver-0", estimators)
-      } else if (est_name == "ipcw-tmle-plugin-DFullReg-compare") {
-        estimators <- c("ipcw-tmle-plugin-DFullReg-compare", estimators)
-      }
+      # set seed
+      current_seed <- round(yscenario * 10) +
+        round(mscenario * 100) +
+        round(xscenario * 100) +
+        round(.n * 1000) + round((seed - 1) * 51)
+      set.seed(current_seed)
 
-      res <- investigate_performance_once(mc_id = 1,
-                                          n = .n,
-                                          XScenario = 1.6,
-                                          YScenario = 4.17,
-                                          missScenario = 1,
-                                          lowcor = 0, midcor = 0, highcor = 0, gencor = 0,
-                                          estimators = estimators,
-                                          tmle_args = list(
-                                            "g_lib" = c("SL.glm"), "miss_lib" = c("SL.glm"),
-                                            "q_lib" = c("SL.glm"), "K" = 5,
-                                            "phase1_covars" = c("Y", "X", "Zs", "Zw"),
-                                            "phase2_covars" = c("Ws", "Ww")
-                                          ),
-                                          mi_args = list("n_imp" = 20, maxiter = 25),
-                                          raking_args = list("NimpRaking" = 20),
-                                          outcome_name = "Y", tx_name = "X",
-                                          fam = "binomial", missing_indicator = "is.complete",
-                                          cached_datasets = NULL, data_only = FALSE,
-                                          plasmode = FALSE,
-                                          data_dir = "./", filename_prefix = "data_m1_y1_x1_n10000_id",
-                                          filename_suffix = ".rds", read_func = readRDS,
-                                          rare_outcome = FALSE)
-      res$results <- cbind(res$results, data.frame(n = rep(.n, nrow(res$results))))
-
-      return(res$results)
+      # run given estimator
+      res <- tryCatch(
+        investigate_performance_once(
+          mc_id = .b, n = .n, XScenario = xscenario, fam = "binomial",
+          YScenario = yscenario, missScenario = mscenario,
+          lowcor = 0.2, midcor = 0.4, highcor = 0.7, gencor = 0.2,
+          outcome_name = "Y", tx_name = "X", missing_indicator = "is.complete",
+          estimators = est_name, tmle_args = tmle_args, mi_args = NULL,
+          raking_args = raking_args, cached_datasets = NULL,
+          data_only = FALSE, plasmode = FALSE,
+          rare_outcome = FALSE, browse = TRUE
+        ), error = function(e) {
+          message(conditionMessage(e))
+          print(paste0("Error occurred when running Monte-Carlo iteration ", .b))
+          traceback()
+          output <- list()
+          output$results <- data.frame(est = est_name,
+                                       psi = NULL,
+                                       lower = NULL,
+                                       upper = NULL)
+          return(output)
+        }
+      )
+      res_df <- cbind(data.frame(n = .n, b = .b), res$results)
+      return(res_df)
     })
   })
 
   return(res_df)
 }
-
-

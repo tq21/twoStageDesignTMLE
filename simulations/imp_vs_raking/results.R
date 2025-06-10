@@ -3,7 +3,7 @@ library(knitr)
 library(kableExtra)
 source("sim_data.R")
 
-res_df <- read.csv("out/miss_type_med_0603_185302.csv")
+res_df <- read.csv("out/miss_type_med_500_0603_212509.csv")
 truth <- get_truth()
 res_df %>%
   summarize(
@@ -11,7 +11,7 @@ res_df %>%
     se = sd(psi),
     mse = mean((psi - truth)^2),
     bias_se = abs_bias / se,
-    coverage = mean((lower <= truth) & (truth <= upper)),
-    power = mean((lower >= 0) & (0 <= upper)),
+    cover = mean((lower <= truth) & (truth <= upper)),
+    oracle_cover = mean(truth >= psi+qnorm(0.025)*sd(psi) & truth <= psi+qnorm(0.975)*sd(psi)),
     .by = c("n", "est_name")
   )
