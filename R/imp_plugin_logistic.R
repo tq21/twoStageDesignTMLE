@@ -11,7 +11,7 @@ library(nleqslv)
 library(sl3)
 imp_plugin_logistic <- function(Y, A, W, W_all, Delta.W, W.stage2,
                                 Q_g_method = "MI",
-                                Nimp = 20,
+                                Nimp = 1,
                                 QAW=NULL, Q0W=NULL, Q1W=NULL, g1W=NULL,
                                 DFullNCReg_pool=TRUE,
                                 Z=NULL, Delta = rep(1, length(Y)), pi=NULL, piform=NULL, pi_oracle=NULL,
@@ -84,7 +84,7 @@ imp_plugin_logistic <- function(Y, A, W, W_all, Delta.W, W.stage2,
   argList$id <- id[Delta.W==1]
   argList$family <- Q.family
   argList$verbose <- verbose
-  if (rareOutcome){
+  if (rareOutcome) {
     argList$Q.SL.library <- c("SL.glm", "SL.glmnet", "tmle.SL.dbarts2")
     argList$Q.discreteSL <- TRUE
     argList$V.Q <- 20
@@ -116,8 +116,8 @@ imp_plugin_logistic <- function(Y, A, W, W_all, Delta.W, W.stage2,
                              W = cbind(comp[, colnames(W), drop = FALSE],
                                        comp[, colnames(W.stage2), drop = FALSE]),
                              family = Q.family,
-                             g.SL.library = c("SL.glm"),
-                             Q.SL.library = c("SL.glm"),
+                             g.SL.library = argList$g.SL.library,
+                             Q.SL.library = argList$Q.SL.library,
                              verbose = FALSE)
         Q1W_m <- tmle_m$Qinit$Q[, "Q1W"]
         Q0W_m <- tmle_m$Qinit$Q[, "Q0W"]

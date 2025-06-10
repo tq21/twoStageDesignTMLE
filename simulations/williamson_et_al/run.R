@@ -17,11 +17,6 @@ source("src_williamson_et_al/02_methods_design.R")
 source("src_williamson_et_al/02_methods_tmle.R")
 source("src_williamson_et_al/03_estimate.R")
 
-est_name <- "rak"
-xscenario <- 1
-yscenario <- 1
-mscenario <- 1
-
 #' function to run simulation
 #'
 #' @param est_name name of the estimator to run
@@ -37,7 +32,9 @@ run <- function(est_name,
                 mscenario,
                 B,
                 n_seq,
-                seed) {
+                seed,
+                tmle_args = NULL,
+                raking_args = NULL) {
 
   set.seed(seed)
   print("running estimator: " %+% est_name)
@@ -46,15 +43,20 @@ run <- function(est_name,
         ", missing scenario: " %+% mscenario)
 
   res_df <- map_dfr(n_seq, function(.n) {
+    # set seed
+    current_seed <- round(yscenario * 10) +
+      round(mscenario * 100) +
+      round(xscenario * 100) +
+      round(.n * 1000) + round((seed - 1) * 51)
+    set.seed(current_seed)
+
     map_dfr(seq(B), function(.b) {
       print("n: " %+% .n %+% ", b: " %+% .b %+% "...")
 
-      # set seed
-      current_seed <- round(yscenario * 10) +
-        round(mscenario * 100) +
-        round(xscenario * 100) +
-        round(.n * 1000) + round((seed - 1) * 51)
-      set.seed(current_seed)
+      if (!is.null(tmle_args)) {
+        tmle_args$phase1_covars <- c("Y", "X", "Zs", "Zw")
+        tmle_args$phase2_covars <- c("Ws", "Ww")
+      }
 
       # run given estimator
       res <- tryCatch(
@@ -66,7 +68,7 @@ run <- function(est_name,
           estimators = est_name, tmle_args = tmle_args, mi_args = NULL,
           raking_args = raking_args, cached_datasets = NULL,
           data_only = FALSE, plasmode = FALSE,
-          rare_outcome = FALSE, browse = TRUE
+          rare_outcome = FALSE, browse = FALSE
         ), error = function(e) {
           message(conditionMessage(e))
           print(paste0("Error occurred when running Monte-Carlo iteration ", .b))

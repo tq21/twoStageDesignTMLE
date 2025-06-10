@@ -193,66 +193,6 @@ run_one_estimator <- function(estimator, df, oracle_formula,
       coefficient_of_interest = tx_name, fam = fam
     )
   }
-  # MI
-  else if (grepl("MICE", estimator, ignore.case = TRUE)) {
-    these_terms <- terms.formula(as.formula(outcome_formula))
-    these_data <- df[, gsub(" ", "", rownames(attr(these_terms, "factors")))]
-    these_data <- cbind(these_data, df[[missing_indicator]])
-    names(these_data)[ncol(these_data)] <- missing_indicator
-    output <- run_mice(
-      data = these_data, outcome_formula = outcome_formula,
-      n_imp = mi_args$n_imp, maxit = mi_args$maxit, fam = fam,
-      coefficient_of_interest = tx_name, missing_indicator = missing_indicator,
-      plasmode=plasmode
-    )
-  }
-  # MI RF
-  else if (grepl("RF", estimator, ignore.case = TRUE)) {
-    these_terms <- terms.formula(as.formula(outcome_formula))
-    these_data <- df[, gsub(" ", "", rownames(attr(these_terms, "factors")))]
-    these_data <- cbind(these_data, df[[missing_indicator]])
-    names(these_data)[ncol(these_data)] <- missing_indicator
-    output <- run_mice(
-      data = these_data, outcome_formula = outcome_formula,
-      n_imp = mi_args$n_imp, maxit = mi_args$maxit, fam = fam,
-      coefficient_of_interest = tx_name, missing_indicator = missing_indicator,
-      method = "rf", plasmode=plasmode
-    )
-  }
-  # XGB -- patterned off MI
-  else if (grepl("XGB", estimator, ignore.case = TRUE)) {
-    these_terms <- terms.formula(as.formula(outcome_formula))
-    these_data <- df[, gsub(" ", "", rownames(attr(these_terms, "factors")))]
-    these_data <- cbind(these_data, df[[missing_indicator]])
-    names(these_data)[ncol(these_data)] <- missing_indicator
-    output <- run_xgb(
-      data = these_data, outcome_formula = outcome_formula, fam = fam,
-      n_imp = mi_args$n_imp,
-      coefficient_of_interest = tx_name, missing_indicator = missing_indicator
-    )
-  }
-  # IPW
-  else if (grepl("IPW", estimator, ignore.case = TRUE) & (!grepl("GR", estimator, ignore.case = TRUE)) & !grepl("rak", estimator, ignore.case = TRUE)) {
-    output <- run_ipw(
-      data = df, outcome_formula = outcome_formula,
-      miss_formula = miss_formula, coefficient_of_interest = tx_name,
-      missing_indicator = missing_indicator, fam = fam
-    )
-  }
-  # IPTW
-  else if (grepl("IPTW", estimator, ignore.case = TRUE)) {
-    output <- run_iptw(
-      data = df, outcome_formula = outcome_formula,
-      miss_formula = miss_formula, coefficient_of_interest = tx_name,
-      stable = grepl("stable", estimator, ignore.case = TRUE)
-    )
-  }
-  # RRZ
-  else if (grepl("RRZ", estimator, ignore.case = TRUE)) {
-    output <- run_RRZ_lr(data = df, outcome_formula = outcome_formula,
-                         cal_formula = "~ X + Zs + Zw", coefficient_of_interest = tx_name,
-                         missing_indicator = missing_indicator, fam = fam)
-  }
   # raking
   else if (grepl("rak", estimator, ignore.case = TRUE) | grepl("gr", estimator, ignore.case = TRUE)) {
     cal_option <- 1
@@ -273,171 +213,29 @@ run_one_estimator <- function(estimator, df, oracle_formula,
                                  lower = tmp$results[tmp$results$estimand == "RD", "est"]+qnorm(0.025)*tmp$results[tmp$results$estimand == "RD", "SE"],
                                  upper = tmp$results[tmp$results$estimand == "RD", "est"]+qnorm(0.975)*tmp$results[tmp$results$estimand == "RD", "SE"])
   }
-  # IPCW-TMLE: ver 0
-  else if (estimator == "ipcw-tmle-ver-0") {
-    tmp <- twoStageTMLE_target_Pi(Y = df$Y,
-                                  A = df$X,
-                                  W = df[, setdiff(tmle_args$phase1_covars, c("X", "Y")), drop = FALSE],
-                                  W.stage2 = df[complete.cases(df), tmle_args$phase2_covars, drop = FALSE],
-                                  Delta.W = df$is.complete,
-                                  condSetNames = c("W", "A", "Y"),
-                                  pi.SL.library = "SL.glm", V.pi = 10,
-                                  Q.family = "binomial",
-                                  Q.SL.library = "SL.glm", V.Q = 10,
-                                  g.SL.library = "SL.glm", V.g = 10,
-                                  augmentW = FALSE,
-                                  verbose = FALSE,
-                                  browse = FALSE)
+  # Full data Q, g method: MICE; Estimator: Imputation-based plug-in TMLE
+  else if (estimator == "mice-tmle") {
+    tmp <- imp_plugin_logistic(Y = df$Y,
+                               A = df$X,
+                               W = df[, setdiff(tmle_args$phase1_covars, c("X", "Y")), drop = FALSE],
+                               W.stage2 = df[complete.cases(df), tmle_args$phase2_covars, drop = FALSE],
+                               Delta.W = df$is.complete,
+                               condSetNames = c("W", "A", "Y"),
+                               Q_g_method = tmle_args$Q_g_method,
+                               Nimp = tmle_args$Nimp,
+                               pi.SL.library = tmle_args$pi.SL.library, V.pi = tmle_args$V.pi,
+                               Q.SL.library = tmle_args$Q.SL.library, V.Q = tmle_args$V.Q,
+                               g.SL.library = tmle_args$g.SL.library, V.g = tmle_args$V.g,
+                               DFullReg_sl_lib = tmle_args$DFullReg_sl_lib,
+                               Q.family = "binomial",
+                               augmentW = FALSE,
+                               verbose = FALSE)
 
     output <- list()
-    output$results <- data.frame(est = c("ipcw-tmle", "ipcw-tmle-target-Pi-ver-0"),
-                                 psi = c(tmp$tmle$estimates$ATE$psi, tmp$tmle_target_Pi$estimates$ATE$psi),
-                                 lower = c(tmp$tmle$estimates$ATE$CI[1], tmp$lower),
-                                 upper = c(tmp$tmle$estimates$ATE$CI[2], tmp$upper))
-  }
-  # IPCW-TMLE: ver 1
-  else if (estimator == "ipcw-tmle-ver-1") {
-    tmp <- twoStageTMLE_target_Pi_ver_1(Y = df$Y,
-                                  A = df$X,
-                                  W = df[, setdiff(tmle_args$phase1_covars, c("X", "Y")), drop = FALSE],
-                                  W.stage2 = df[complete.cases(df), tmle_args$phase2_covars, drop = FALSE],
-                                  Delta.W = df$is.complete,
-                                  condSetNames = c("W", "A", "Y"),
-                                  pi.SL.library = "SL.glm", V.pi = 10,
-                                  Q.family = "binomial",
-                                  Q.SL.library = "SL.glm", V.Q = 10,
-                                  g.SL.library = "SL.glm", V.g = 10,
-                                  augmentW = FALSE,
-                                  verbose = FALSE,
-                                  browse = FALSE)
-
-    output <- list()
-    output$results <- data.frame(est = c("ipcw-tmle", "ipcw-tmle-target-Pi-ver-1"),
-                                 psi = c(tmp$tmle$estimates$ATE$psi, tmp$tmle_target_Pi$estimates$ATE$psi),
-                                 lower = c(tmp$tmle$estimates$ATE$CI[1], tmp$lower),
-                                 upper = c(tmp$tmle$estimates$ATE$CI[2], tmp$upper))
-  }
-  # IPCW-TMLE: ver 2
-  else if (estimator == "ipcw-tmle-ver-2") {
-    tmp <- twoStageTMLE_target_Pi_ver_2(Y = df$Y,
-                                  A = df$X,
-                                  W = df[, setdiff(tmle_args$phase1_covars, c("X", "Y")), drop = FALSE],
-                                  W.stage2 = df[complete.cases(df), tmle_args$phase2_covars, drop = FALSE],
-                                  Delta.W = df$is.complete,
-                                  condSetNames = c("W", "A", "Y"),
-                                  pi.SL.library = "SL.glm", V.pi = 10,
-                                  Q.family = "binomial",
-                                  Q.SL.library = "SL.glm", V.Q = 10,
-                                  g.SL.library = "SL.glm", V.g = 10,
-                                  augmentW = FALSE,
-                                  verbose = FALSE,
-                                  browse = FALSE)
-
-    output <- list()
-    output$results <- data.frame(est = c("ipcw-tmle", "ipcw-tmle-target-Pi-ver-2"),
-                                 psi = c(tmp$tmle$estimates$ATE$psi, tmp$tmle_target_Pi$estimates$ATE$psi),
-                                 lower = c(tmp$tmle$estimates$ATE$CI[1], tmp$lower),
-                                 upper = c(tmp$tmle$estimates$ATE$CI[2], tmp$upper))
-  }
-  # IPCW-TMLE: ver 3
-  else if (estimator == "ipcw-tmle-ver-3") {
-    tmp <- twoStageTMLE_target_Pi_ver_3(Y = df$Y,
-                                        A = df$X,
-                                        W = df[, setdiff(tmle_args$phase1_covars, c("X", "Y")), drop = FALSE],
-                                        W.stage2 = df[complete.cases(df), tmle_args$phase2_covars, drop = FALSE],
-                                        Delta.W = df$is.complete,
-                                        condSetNames = c("W", "A", "Y"),
-                                        pi.SL.library = "SL.glm", V.pi = 10,
-                                        Q.family = "binomial",
-                                        Q.SL.library = "SL.glm", V.Q = 10,
-                                        g.SL.library = "SL.glm", V.g = 10,
-                                        augmentW = FALSE,
-                                        verbose = FALSE,
-                                        browse = FALSE)
-
-    output <- list()
-    output$results <- data.frame(est = c("ipcw-tmle", "ipcw-tmle-target-Pi-ver-3"),
-                                 psi = c(tmp$tmle$estimates$ATE$psi, tmp$tmle_target_Pi$estimates$ATE$psi),
-                                 lower = c(tmp$tmle$estimates$ATE$CI[1], tmp$lower),
-                                 upper = c(tmp$tmle$estimates$ATE$CI[2], tmp$upper))
-  }
-  # IPCW-TMLE plugin: ver 0
-  else if (estimator == "ipcw-tmle-plugin-ver-0") {
-    tmp <- twoStageTMLE_plugin_ver_0(Y = df$Y,
-                                     A = df$X,
-                                     W = df[, setdiff(tmle_args$phase1_covars, c("X", "Y")), drop = FALSE],
-                                     W.stage2 = df[complete.cases(df), tmle_args$phase2_covars, drop = FALSE],
-                                     Delta.W = df$is.complete,
-                                     condSetNames = c("W", "A", "Y"),
-                                     pi.SL.library = "SL.glm", V.pi = 10,
-                                     Q.family = "binomial",
-                                     Q.SL.library = "SL.glm", V.Q = 10,
-                                     g.SL.library = "SL.glm", V.g = 10,
-                                     augmentW = FALSE,
-                                     verbose = FALSE,
-                                     browse = FALSE)
-
-    output <- list()
-    output$results <- data.frame(est = c("ipcw-tmle", "ipcw-tmle-plugin-ver-0"),
+    output$results <- data.frame(est = c("ipcw-tmle", "plugin-tmle"),
                                  psi = c(tmp$tmle$estimates$ATE$psi, tmp$psi),
                                  lower = c(tmp$tmle$estimates$ATE$CI[1], tmp$lower),
                                  upper = c(tmp$tmle$estimates$ATE$CI[2], tmp$upper))
-  }
-  # IPCW-TMLE plugin: compare three methods to estimate E(DFullNC|Delta=1,V)
-  else if (estimator == "ipcw-tmle-plugin-DFullReg-compare") {
-    tmp <- twoStageTMLE_plugin_DFullReg_compare(Y = df$Y,
-                                                A = df$X,
-                                                W = df[, setdiff(tmle_args$phase1_covars, c("X", "Y")), drop = FALSE],
-                                                W.stage2 = df[complete.cases(df), tmle_args$phase2_covars, drop = FALSE],
-                                                Delta.W = df$is.complete,
-                                                condSetNames = c("W", "A", "Y"),
-                                                pi.SL.library = "SL.glm", V.pi = 10,
-                                                Q.family = "binomial",
-                                                Q.SL.library = "SL.glm", V.Q = 10,
-                                                g.SL.library = "SL.glm", V.g = 10,
-                                                augmentW = FALSE,
-                                                verbose = FALSE,
-                                                browse = FALSE)
-    output <- list()
-    output$results <- data.frame(est = c("ipcw-tmle",
-                                         "ipcw-tmle-plugin-DFullReg-SL",
-                                         "ipcw-tmle-plugin-DFullReg-MI",
-                                         "ipcw-tmle-plugin-DFullReg-MI-direct"),
-                                 psi = c(tmp$tmle$estimates$ATE$psi, tmp$psi, tmp$psi_MI, tmp$psi_MI_direct),
-                                 lower = c(tmp$tmle$estimates$ATE$CI[1], tmp$lower, tmp$lower_MI, tmp$lower_MI_direct),
-                                 upper = c(tmp$tmle$estimates$ATE$CI[2], tmp$upper, tmp$upper_MI, tmp$upper_MI_direct))
-  }
-  # TMLE-M
-  else if (grepl("TMLE", estimator, ignore.case = TRUE)) {
-    # check if TMLE-M or TMLE-MTO
-    if (grepl("TO", estimator, ignore.case = TRUE)) {
-      g_lib <- tmle_args$g_lib
-      q_lib <- tmle_args$q_lib
-    } else {
-      g_lib <- "SL.glm"
-      q_lib <- "SL.glm"
-    }
-    # check if we should augment W for predicting missing-data probability
-    augment_w <- grepl("-a-", estimator)
-    # check if we should use the rare-outcome library for Q
-    rare_outcome <- grepl("r-", estimator)
-    this_procedure <- estimator
-    obs_data <- fix_factor_variables(df[, obs_vars])
-    output <- run_subcaltmle(
-      data = obs_data, g_learner_lib = g_lib,
-      miss_learner_lib = tmle_args$miss_lib,
-      q_learner_lib = q_lib, K = tmle_args$K,
-      phase1_covars = tmle_args$phase1_covars,
-      phase2_covars = tmle_args$phase2_covars,
-      outcome_name = outcome_name,
-      tx_name = tx_name, delta_name = missing_indicator,
-      outcome_formula = outcome_formula, outcome_formula_factor = outcome_formula_factor,
-      miss_formula = miss_formula, miss_formula_factor = miss_formula_factor,
-      tx_formula = tx_formula, tx_formula_factor = tx_formula_factor,
-      procedure = this_procedure, fam = fam,
-      condition_on_auxiliary = grepl("A[^gt]", outcome_formula, perl = TRUE),
-      augment_w = augment_w, rare_outcome = rare_outcome
-    )
   } else {
     output <- NULL
   }
