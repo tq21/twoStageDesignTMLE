@@ -156,6 +156,7 @@ run_raking_lr <- function(data = NULL, formula = "Y ~ X", NimpRaking = 50, calOp
                           miss_formula = "is.complete ~ X + Y",
                           coefficient_of_interest = "X", missing_indicator = "is.complete",
                           fam = "binomial") {
+  calOption <- 2
   # get initial weights
   if (is.null(pi)) {
     miss_fit <- glm(formula = as.formula(miss_formula), family = "binomial", data = data)
@@ -245,7 +246,7 @@ run_raking_lr <- function(data = NULL, formula = "Y ~ X", NimpRaking = 50, calOp
   # weights_aug <- numeric(nrow(data))
   # weights_aug[data[[missing_indicator]] == 1] <- weights
   # weights_aug[data[[missing_indicator]] == 0] <- ip_weights[data[[missing_indicator]] == 0]
-  # mean(data2$infX*weights_aug*(data2$Delta-1/weights_aug))
+  # mean(data2$infX*weights_aug*(data2$is.complete-1/weights_aug))
 
   if (fam == "binomial") {
     rakefit <- survey::svyglm(formula, design = infcal, family = quasibinomial)

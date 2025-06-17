@@ -10,12 +10,15 @@ library(mice)
 library(data.table)
 library(marginaleffects)
 library(sl3)
+library(future)
 load_all()
 source("src_williamson_et_al/00_utils.R")
 source("src_williamson_et_al/01_generate_data.R")
 source("src_williamson_et_al/02_methods_design.R")
 source("src_williamson_et_al/02_methods_tmle.R")
 source("src_williamson_et_al/03_estimate.R")
+ncores <- 5
+plan(multisession, workers = ncores)
 
 #' function to run simulation
 #'

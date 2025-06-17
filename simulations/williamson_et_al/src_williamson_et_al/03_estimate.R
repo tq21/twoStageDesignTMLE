@@ -229,7 +229,8 @@ run_one_estimator <- function(estimator, df, oracle_formula,
                                DFullReg_sl_lib = tmle_args$DFullReg_sl_lib,
                                Q.family = "binomial",
                                augmentW = FALSE,
-                               verbose = FALSE)
+                               verbose = FALSE,
+                               browse = FALSE)
 
     output <- list()
     output$results <- data.frame(est = c("ipcw-tmle", "plugin-tmle"),

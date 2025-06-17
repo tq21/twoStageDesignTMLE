@@ -11,6 +11,8 @@ library(nleqslv)
 library(sl3)
 imp_plugin_logistic <- function(Y, A, W, W_all, Delta.W, W.stage2,
                                 Q_g_method = "MI",
+                                mi_engine = c("mice", "mixgb"),
+                                mixgb_params = list(),
                                 Nimp = 1,
                                 QAW=NULL, Q0W=NULL, Q1W=NULL, g1W=NULL,
                                 DFullNCReg_pool=TRUE,
@@ -27,6 +29,8 @@ imp_plugin_logistic <- function(Y, A, W, W_all, Delta.W, W.stage2,
                                 verbose=FALSE, browse=FALSE, ...) {
 
   if (browse) browser()
+  mi_engine <- "mice"
+  mi_engine <- match.arg(mi_engine)
 
   if(is.null(id)){id <- 1:length(Y)}
 
@@ -104,13 +108,26 @@ imp_plugin_logistic <- function(Y, A, W, W_all, Delta.W, W.stage2,
                           Delta.W = Delta.W,
                           W,
                           W.stage2_aug)
-      init <- mice::mice(df_mi, maxit = 0)
-      predM <- init$predictorMatrix
-      imp <- mice::mice(df_mi, predictorMatrix = predM, m = Nimp, maxit = 20, print = FALSE)
-      Q1W_all <- Q0W_all <- QAW_all <- g1W_all <- matrix(0, nrow = length(Y), ncol = Nimp)
+      if (mi_engine == "mice") {
+        init <- mice::mice(df_mi, maxit = 0)
+        predM <- init$predictorMatrix
+        imp  <- mice::mice(df_mi, predictorMatrix = predM, m = Nimp,
+                           maxit = 20, print = FALSE)
+        imp_list <- lapply(seq_len(Nimp), function(x) {
+          mice::complete(imp, x)
+        })
+      } else if (mi_engine == "mixgb") {
+        if (!requireNamespace("mixgb", quietly = TRUE)) {
+          stop("Please install the 'mixgb' package to use mixgb imputation.")
+        }
+        mixgb_args <- c(list(data = df_mi, m = Nimp), mixgb_params)
+        imp_list <- do.call(mixgb::mixgb, mixgb_args)
+      }
 
-      for (m in 1:Nimp) {
-        comp <- mice::complete(imp, m)
+      Q1W_all <- Q0W_all <- QAW_all <- g1W_all <- matrix(0, nrow = length(Y), ncol = length(imp_list))
+
+      for (m in 1:length(imp_list)) {
+        comp <- imp_list[[m]]
         tmle_m <- tmle::tmle(Y = comp$Y,
                              A = comp$A,
                              W = cbind(comp[, colnames(W), drop = FALSE],
