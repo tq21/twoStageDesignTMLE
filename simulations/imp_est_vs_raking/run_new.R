@@ -5,6 +5,9 @@ library(survey)
 library(mice)
 library(data.table)
 library(marginaleffects)
+library(sl3)
+library(doMC)
+registerDoMC(cores = 5)
 load_all()
 `%+%` <- function(a, b) paste0(a, b)
 source("sim_data.R")
@@ -21,13 +24,6 @@ run <- function(Y_type,
                 seed,
                 truth) {
 
-  # custom HAL
-  hal_lrnr <- create.Learner("SL.hal9001",
-                             params = list(max_degree = 2,
-                                           smoothness_orders = 1,
-                                           num_knots = 5))
-
-  set.seed(seed)
   B <- 100#500
   n_seq <- 2000#seq(500, 2000, 500)
 
@@ -38,53 +34,48 @@ run <- function(Y_type,
 
     walk(seq(B), function(.b) {
       cat("n: " %+% .n %+% ", b: " %+% .b %+% "...\n")
+      set.seed(seed+.b)
       data_obj <- sim_data(n = .n, Y_type = Y_type, miss_type = miss_type)
       data <- data_obj$data
       Pi <- data_obj$Pi
 
-      args_tmle <- list(
-        Y = data$Y,
-        A = data$A,
-        W = data[, c("W1", "W2"), drop = FALSE],
-        W.stage2 = data[complete.cases(data), c("W3", "W4"), drop = FALSE],
-        Delta.W = data$Delta,
-        condSetNames = c("W", "A", "Y"),
-        Q_g_method = "ipcw",
-        pi.SL.library = c(hal_lrnr$names), V.pi = 5,
-        Q.family = "binomial",
-        Q.SL.library = c(hal_lrnr$names), V.Q = 5,
-        g.SL.library = c(hal_lrnr$names), V.g = 5,
-        augmentW = FALSE,
-        verbose = FALSE,
-        browse = TRUE
-      )
-      if (true_Pi) {
-        args_tmle$pi_oracle <- Pi
-      }
-      res_tmle <- do.call("imp_plugin_logistic", args_tmle)
+      # IPCW-TMLE + efficient IPCW-TMLE
+      res_tmle <- ipcw_tmle_imp(data = data,
+                                W_name = c("W1", "W2", "W3", "W4"),
+                                A_name = "A",
+                                Y_name = "Y",
+                                Delta_name = "Delta",
+                                V_name = c("W1", "W2", "A", "Y"),
+                                nfolds = 5,
+                                Pi_method = "HAL",
+                                Q_method = "HAL",
+                                g_method = "HAL",
+                                m_method = "HAL",
+                                family = "binomial",
+                                enumerate_basis_args = list(max_degree = 3,
+                                                            smoothness_orders = 1,
+                                                            num_knots = 5),
+                                browse = FALSE)
 
       # raking -----------------------------------------------------------------
-      args_rak <- list(
-        data = data,
-        formula = "Y ~ A + W1 + W2 + W3 + W4",
-        miss_formula = "Delta ~ W1 + W2 + A + Y",
-        NimpRaking = 20,
-        calOption = 1,
-        fam = "binomial",
-        coefficient_of_interest = "A",
-        missing_indicator = "Delta",
-        start_from_ipw = FALSE,
-        rake_on_y = FALSE
-      )
-      res_rak <- do.call("run_raking_lr", args_rak)
+      res_rak <- run_raking_lr(data = data,
+                               formula = "Y ~ A + W1 + W2 + W3 + W4",
+                               miss_formula = "Delta ~ W1 + W2 + A + Y",
+                               NimpRaking = 20,
+                               calOption = 1,
+                               fam = "binomial",
+                               coefficient_of_interest = "A",
+                               missing_indicator = "Delta",
+                               start_from_ipw = FALSE,
+                               rake_on_y = FALSE)
 
       # store results
-      ipcw_tmle_psi[.b] <<- res_tmle$tmle$estimates$ATE$psi
-      ipcw_tmle_lower[.b] <<- res_tmle$tmle$estimates$ATE$CI[1]
-      ipcw_tmle_upper[.b] <<- res_tmle$tmle$estimates$ATE$CI[2]
-      ipcw_tmle_imp_psi[.b] <<- res_tmle$psi
-      ipcw_tmle_imp_lower[.b] <<- res_tmle$lower
-      ipcw_tmle_imp_upper[.b] <<- res_tmle$upper
+      ipcw_tmle_psi[.b] <<- res_tmle$psi_ipcw_tmle
+      ipcw_tmle_lower[.b] <<- res_tmle$lower_ipcw_tmle
+      ipcw_tmle_upper[.b] <<- res_tmle$upper_ipcw_tmle
+      ipcw_tmle_imp_psi[.b] <<- res_tmle$psi_tmle
+      ipcw_tmle_imp_lower[.b] <<- res_tmle$lower_tmle
+      ipcw_tmle_imp_upper[.b] <<- res_tmle$upper_tmle
       aipcw_tmle_imp_psi[.b] <<- res_tmle$psi_aipcw
       aipcw_tmle_imp_lower[.b] <<- res_tmle$lower_aipcw
       aipcw_tmle_imp_upper[.b] <<- res_tmle$upper_aipcw
@@ -100,10 +91,13 @@ run <- function(Y_type,
       # print running results
       cur_mse_rak <- mean((rak_psi-truth)^2, na.rm = TRUE)
       cur_cover_rak <- mean(rak_lower <= truth & rak_upper >= truth, na.rm = TRUE)
-      cur_mse_ipcw <- mean((ipcw_tmle_imp_psi-truth)^2, na.rm = TRUE)
-      cur_cover_ipcw <- mean(ipcw_tmle_imp_lower <= truth & ipcw_tmle_imp_upper >= truth, na.rm = TRUE)
-      cat("raking MSE: " %+% cur_mse_rak %+% ", coverage: " %+% round(cur_cover_rak, 2) %+% "\n")
-      cat("IPCW-TMLE-imp MSE: " %+% cur_mse_ipcw %+% ", coverage: " %+% round(cur_cover_ipcw, 2) %+% "\n")
+      cur_mse_ipcw_tmle <- mean((ipcw_tmle_psi-truth)^2, na.rm = TRUE)
+      cur_cover_ipcw_tmle <- mean(ipcw_tmle_lower <= truth & ipcw_tmle_upper >= truth, na.rm = TRUE)
+      cur_mse_tmle <- mean((ipcw_tmle_imp_psi-truth)^2, na.rm = TRUE)
+      cur_cover_tmle <- mean(ipcw_tmle_imp_lower <= truth & ipcw_tmle_imp_upper >= truth, na.rm = TRUE)
+      cat("raking MSE:              " %+% cur_mse_rak %+% ", coverage: " %+% round(cur_cover_rak, 2) %+% "\n")
+      cat("IPCW-TMLE MSE:           " %+% cur_mse_ipcw_tmle %+% ", coverage: " %+% round(cur_cover_ipcw_tmle, 2) %+% "\n")
+      cat("Efficient IPCW-TMLE MSE: " %+% cur_mse_tmle %+% ", coverage: " %+% round(cur_cover_tmle, 2) %+% "\n")
     })
 
     return(rbind(data.frame(n = .n, b = seq_len(B),

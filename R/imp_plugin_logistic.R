@@ -29,7 +29,6 @@ imp_plugin_logistic <- function(Y, A, W, W_all, Delta.W, W.stage2,
                                 verbose=FALSE, browse=FALSE, ...) {
 
   if (browse) browser()
-  mi_engine <- "mice"
   mi_engine <- match.arg(mi_engine)
 
   if(is.null(id)){id <- 1:length(Y)}
